@@ -25,6 +25,8 @@ const userSchema = new mongoose.Schema({
     state:   { type: String, default: "" },
     country: { type: String, default: "" },
   },
+  resetOTP:       { type: String,  default: null },
+resetOTPExpiry: { type: Date,    default: null },
   
 }, { timestamps: true });
 

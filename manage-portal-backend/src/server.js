@@ -20,6 +20,7 @@ app.use("/api/announcements", require("./routes/announcements"));
 app.use("/api/payroll", require("./routes/payroll"));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/reports", require("./routes/reports"));
+app.use("/api/email", require("./routes/email"));
 
 app.get("/", (req, res) => res.json({ message: "ManagePortal API running" }));
 

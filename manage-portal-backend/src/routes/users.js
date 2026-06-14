@@ -1,7 +1,8 @@
-const express    = require("express");
-const User       = require("../models/User");
-const { protect }    = require("../middleware/auth");
-const { adminOnly }  = require("../middleware/roleCheck");
+const express            = require("express");
+const User               = require("../models/User");
+const { protect }        = require("../middleware/auth");
+const { adminOnly }      = require("../middleware/roleCheck");
+const { sendWelcomeEmail } = require("../services/emailService");
 
 const router = express.Router();
 
@@ -33,12 +34,20 @@ router.post("/", protect, adminOnly, async (req, res) => {
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: "Email already exists" });
 
-    const user = await User.create({
-      firstName, lastName, email,
-      password: password || "Employee@123",
-      ...rest,
-    });
-    res.status(201).json({ ...user.toObject(), password: undefined });
+    const plainPassword = password || "Employee@123";
+    const user = new User({ firstName, lastName, email, password: plainPassword, ...rest });
+    await user.save();
+
+    // Send welcome email — don't fail request if email fails
+    try {
+      await sendWelcomeEmail(email, firstName, plainPassword);
+    } catch (emailErr) {
+      console.error("Welcome email failed:", emailErr.message);
+    }
+
+    const userObj = user.toObject();
+    delete userObj.password;
+    res.status(201).json(userObj);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -47,7 +56,6 @@ router.post("/", protect, adminOnly, async (req, res) => {
 // PUT /api/users/:id
 router.put("/:id", protect, async (req, res) => {
   try {
-    // Employee can only update their own profile
     if (req.user.role !== "admin" && req.user._id.toString() !== req.params.id) {
       return res.status(403).json({ message: "Not authorized" });
     }
