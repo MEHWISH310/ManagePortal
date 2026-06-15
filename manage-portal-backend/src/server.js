@@ -21,6 +21,8 @@ app.use("/api/payroll", require("./routes/payroll"));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/reports", require("./routes/reports"));
 app.use("/api/email", require("./routes/email"));
+app.use("/api/payment",  require("./routes/payment"));
+app.use("/api/training", require("./routes/training"));
 
 app.get("/", (req, res) => res.json({ message: "ManagePortal API running" }));
 

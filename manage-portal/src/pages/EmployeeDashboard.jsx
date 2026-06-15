@@ -9,6 +9,7 @@ import TasksTab                 from "../features/tasks/TasksTab";
 import EmployeeAnnouncementsTab from "../features/announcements/EmployeeAnnouncementsTab";
 import EmployeeNotificationsTab from "../features/notifications/EmployeeNotificationsTab";
 import EmployeeProfilePage      from "../features/profile/EmployeeProfilePage";
+import TrainingTab              from "../features/training/TrainingTab";
 import { fetchUser }            from "../shared/api/usersApi";
 import { apiGet }               from "../shared/api/apiClient";
 import { GridIcon, LogoutIcon } from "../shared/icons/icons";
@@ -20,6 +21,7 @@ const NAV = [
   { id: "tasks",         path: "tasks",         label: "My Tasks"      },
   { id: "announcements", path: "announcements", label: "Announcements" },
   { id: "notifications", path: "notifications", label: "Notifications" },
+  { id: "training",      path: "training",      label: "Training"      },
   { id: "profile",       path: "profile",       label: "My Profile"    },
 ];
 
@@ -29,7 +31,7 @@ export default function EmployeeDashboard({ onLogout }) {
   const location = useLocation();
 
   const [myProfile, setMyProfile] = useState(null);
-  const [notifs, setNotifs]       = useState([]);
+  const [notifs,    setNotifs]    = useState([]);
 
   useEffect(() => {
     apiGet("/notifications")
@@ -53,23 +55,22 @@ export default function EmployeeDashboard({ onLogout }) {
       const data = await fetchUser(user.id);
       setMyProfile({
         isAdmin:    false,
-        id:         data.id,
+        id:         data._id || data.id,
         name:       `${data.firstName} ${data.lastName}`,
         email:      data.email,
         phone:      data.phone,
         username:   data.username,
-        birthDate:  data.birthDate,
         age:        data.age,
         gender:     data.gender,
         bloodGroup: data.bloodGroup,
         image:      data.image,
         role:       data.role,
-        dept:       data.company?.department || "General",
-        jobTitle:   data.company?.title      || "",
-        company:    data.company?.name       || "",
-        university: data.university          || "",
+        dept:       data.dept       || "General",
+        jobTitle:   data.jobTitle   || "",
+        company:    data.company    || "",
+        university: data.university || "",
         address:    data.address,
-        status:     "Active",
+        status:     data.status     || "Active",
         avatar:     `${data.firstName[0]}${data.lastName[0]}`.toUpperCase(),
       });
     } catch (err) {
@@ -145,6 +146,7 @@ export default function EmployeeDashboard({ onLogout }) {
               <Route path="tasks"         element={<TasksTab />} />
               <Route path="announcements" element={<EmployeeAnnouncementsTab />} />
               <Route path="notifications" element={<EmployeeNotificationsTab notifs={notifs} />} />
+              <Route path="training"      element={<TrainingTab mode="employee" />} />
               <Route path="profile"       element={
                 <EmployeeProfilePage
                   employee={{ isAdmin: false, id: user.id, name: user.name, email: user.email, role: user.role, image: user.image }}

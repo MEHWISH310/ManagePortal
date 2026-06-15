@@ -12,6 +12,7 @@ import AdminAnnouncementsTab from "../features/announcements/AdminAnnouncementsT
 import ReportsTab            from "../features/reports/ReportsTab";
 import AdminNotificationsTab from "../features/notifications/AdminNotificationsTab";
 import EmployeeProfilePage   from "../features/profile/EmployeeProfilePage";
+import TrainingTab           from "../features/training/TrainingTab";
 import { useEmployees }      from "../shared/hooks/useEmployees";
 import { fetchUser }         from "../shared/api/usersApi";
 import { apiGet }            from "../shared/api/apiClient";
@@ -25,6 +26,7 @@ const NAV = [
   { id: "announcements", path: "announcements", label: "Announcements"  },
   { id: "reports",       path: "reports",       label: "Reports"        },
   { id: "notifications", path: "notifications", label: "Notifications"  },
+  { id: "training",      path: "training",      label: "Training"       },
 ];
 
 export default function AdminDashboard({ onLogout }) {
@@ -32,10 +34,10 @@ export default function AdminDashboard({ onLogout }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [showImport,    setShowImport]    = useState(false);
-  const [editEmployee,  setEditEmployee]  = useState(null);
-  const [myProfile,     setMyProfile]     = useState(null);
-  const [notifs,        setNotifs]        = useState([]);
+  const [showImport,   setShowImport]   = useState(false);
+  const [editEmployee, setEditEmployee] = useState(null);
+  const [myProfile,    setMyProfile]    = useState(null);
+  const [notifs,       setNotifs]       = useState([]);
 
   const { employees, loading, error, handleAdd, handleDelete, handleUpdate } = useEmployees();
 
@@ -64,23 +66,22 @@ export default function AdminDashboard({ onLogout }) {
       const data = await fetchUser(user.id);
       setMyProfile({
         isAdmin:    false,
-        id:         data.id,
+        id:         data._id || data.id,
         name:       `${data.firstName} ${data.lastName}`,
         email:      data.email,
         phone:      data.phone,
         username:   data.username,
-        birthDate:  data.birthDate,
         age:        data.age,
         gender:     data.gender,
         bloodGroup: data.bloodGroup,
         image:      data.image,
         role:       data.role,
-        dept:       data.company?.department || "General",
-        jobTitle:   data.company?.title      || "",
-        company:    data.company?.name       || "",
-        university: data.university          || "",
+        dept:       data.dept       || "General",
+        jobTitle:   data.jobTitle   || "",
+        company:    data.company    || "",
+        university: data.university || "",
         address:    data.address,
-        status:     "Active",
+        status:     data.status     || "Active",
         avatar:     `${data.firstName[0]}${data.lastName[0]}`.toUpperCase(),
       });
     } catch (err) {
@@ -182,14 +183,14 @@ export default function AdminDashboard({ onLogout }) {
                     />
                   ) : (
                     <EmployeesTab
-  employees={employees}
-  onAdd={handleAdd}
-  onDelete={handleDelete}
-  onEdit={(e) => setEditEmployee({ ...e, isAdmin: true })}
-  onStatusChange={(id, status) => handleUpdate({ ...employees.find(e => e.id === id), status })}
-  currentUserId={user.id}
-  onImport={() => setShowImport(true)}
-/>
+                      employees={employees}
+                      onAdd={handleAdd}
+                      onDelete={handleDelete}
+                      onEdit={(e) => setEditEmployee({ ...e, isAdmin: true })}
+                      onStatusChange={(id, status) => handleUpdate({ ...employees.find(e => e.id === id), status })}
+                      currentUserId={user.id}
+                      onImport={() => setShowImport(true)}
+                    />
                   )
                 }
               />
@@ -205,6 +206,7 @@ export default function AdminDashboard({ onLogout }) {
               <Route path="announcements" element={<AdminAnnouncementsTab />} />
               <Route path="reports"       element={<ReportsTab />} />
               <Route path="notifications" element={<AdminNotificationsTab notifs={notifs} />} />
+              <Route path="training"      element={<TrainingTab mode="admin" />} />
               <Route path="*"             element={<Navigate to="overview" replace />} />
             </Routes>
           )}
