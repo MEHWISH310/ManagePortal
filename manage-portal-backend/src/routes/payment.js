@@ -3,7 +3,8 @@ const Razorpay = require("razorpay");
 const crypto   = require("crypto");
 const Payment  = require("../models/Payment");
 const Training = require("../models/Training");
-const { protect } = require("../middleware/auth");
+const { protect }   = require("../middleware/auth");
+const { adminOnly } = require("../middleware/roleCheck");
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.post("/create-order", protect, async (req, res) => {
     if (!training) return res.status(404).json({ message: "Training not found" });
 
     const order = await razorpay.orders.create({
-      amount:   training.price * 100, // paise mein
+      amount:   training.price * 100,
       currency: "INR",
       receipt:  `receipt_${Date.now()}`,
     });
@@ -50,8 +51,8 @@ router.post("/verify", protect, async (req, res) => {
   try {
     const { razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
 
-    const body      = razorpayOrderId + "|" + razorpayPaymentId;
-    const expected  = crypto
+    const body     = razorpayOrderId + "|" + razorpayPaymentId;
+    const expected = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(body)
       .digest("hex");
@@ -77,6 +78,35 @@ router.get("/my-payments", protect, async (req, res) => {
   try {
     const payments = await Payment.find({ userId: req.user._id })
       .populate("trainingId", "title date price")
+      .populate("userId", "firstName lastName email")
+      .sort({ createdAt: -1 });
+    res.json(payments);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/payment/all-payments — admin only
+router.get("/all-payments", protect, adminOnly, async (req, res) => {
+  try {
+    const payments = await Payment.find()
+      .populate("userId",     "firstName lastName email dept")
+      .populate("trainingId", "title date price duration")
+      .sort({ createdAt: -1 });
+    res.json(payments);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/payment/enrolled/:trainingId — admin sees who enrolled
+router.get("/enrolled/:trainingId", protect, adminOnly, async (req, res) => {
+  try {
+    const payments = await Payment.find({ 
+      trainingId: req.params.trainingId, 
+      status: "paid" 
+    })
+      .populate("userId", "firstName lastName email dept jobTitle")
       .sort({ createdAt: -1 });
     res.json(payments);
   } catch (err) {

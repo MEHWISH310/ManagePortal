@@ -83,7 +83,7 @@ export default function EmployeeOverview({ onNavigate }) {
     <>
       {/* Stat cards — only API data */}
       <div className="db-stats-grid">
-        <StatCard label="Total Tasks"    value={total}     sub="from DummyJSON API"   Icon={CheckBigIcon} accentBg="#eff6ff" accentColor="#2563eb" />
+        <StatCard label="Total Tasks"    value={total}     sub="tasks so far"   Icon={CheckBigIcon} accentBg="#eff6ff" accentColor="#2563eb" />
         <StatCard label="Tasks Pending"  value={pending}   sub="need to be completed" Icon={CheckBigIcon} accentBg="#fef9ec" accentColor="#d97706" />
         <StatCard label="Tasks Done"     value={completed} sub="completed so far"     Icon={CheckBigIcon} accentBg="#f0fdf4" accentColor="#16a34a" />
         <StatCard label="Announcements"  value={announcements.length} sub="total posts" Icon={CheckBigIcon} accentBg="#fdf4ff" accentColor="#9333ea" />
