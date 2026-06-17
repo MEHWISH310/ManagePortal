@@ -29,7 +29,7 @@ const NAV = [
   { id: "training",      path: "training",      label: "Training"       },
 ];
 
-export default function AdminDashboard({ onLogout }) {
+export default function AdminDashboard({ onLogout, onImpersonate }) {
   const user     = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
   const location = useLocation();
@@ -190,8 +190,9 @@ export default function AdminDashboard({ onLogout }) {
                       onStatusChange={(id, status) => handleUpdate({ ...employees.find(e => e.id === id), status })}
                       currentUserId={user.id}
                       onImport={() => setShowImport(true)}
+                      onImpersonate={onImpersonate}
                     />
-                  )
+                )
                 }
               />
               <Route

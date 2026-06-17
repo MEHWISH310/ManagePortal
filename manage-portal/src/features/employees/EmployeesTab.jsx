@@ -7,6 +7,7 @@ import { TrashIcon }    from "../../shared/icons/icons";
 import AddEmployeeModal    from "./AddEmployeeModel";
 import DeleteConfirmModal  from "./DeleteConfirmModel";
 import EmployeeDetailModal from "./EmployeeDetailModal";
+import { impersonateUser } from "../../shared/api/authApi";
 
 const EditIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -132,7 +133,7 @@ function ExportDropdown({ data }) {
   );
 }
 
-export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onStatusChange, currentUserId, onImport }) {
+export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onStatusChange, currentUserId, onImport, onImpersonate }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [selectedEmp,  setSelectedEmp]  = useState(null);
@@ -140,6 +141,7 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
   const [deptFilter,   setDeptFilter]   = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [roleFilter,   setRoleFilter]   = useState("");
+  const [impersonating, setImpersonating] = useState(null);
 
   const filtered = useMemo(() => {
     return employees.filter(e => {
@@ -158,6 +160,17 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
 
   const hasFilters = search || deptFilter || statusFilter || roleFilter;
   const clearFilters = () => { setSearch(""); setDeptFilter(""); setStatusFilter(""); setRoleFilter(""); };
+  const handleImpersonate = async (emp) => {
+  setImpersonating(emp.id);
+  try {
+    const data = await impersonateUser(emp.id);
+    onImpersonate(data);
+  } catch {
+    alert("Failed to impersonate. Please try again.");
+  } finally {
+    setImpersonating(null);
+  }
+};
 
   const ARROW = `url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")`;
 
@@ -256,20 +269,32 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
                     ) : (
                       <>
                         <button onClick={() => onEdit?.(e)} title="Edit"
-                          style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1" }}
-                          onMouseEnter={ev => { ev.currentTarget.style.background = "#eff6ff"; ev.currentTarget.style.color = "#2563eb"; }}
-                          onMouseLeave={ev => { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.color = "#cbd5e1"; }}
-                        ><EditIcon /></button>
-                        <button onClick={() => setDeleteTarget(e)} title="Remove"
-                          style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1" }}
-                          onMouseEnter={ev => { ev.currentTarget.style.background = "#fef2f2"; ev.currentTarget.style.color = "#dc2626"; }}
-                          onMouseLeave={ev => { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.color = "#cbd5e1"; }}
-                        ><TrashIcon /></button>
+  style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1" }}
+  onMouseEnter={ev => { ev.currentTarget.style.background = "#eff6ff"; ev.currentTarget.style.color = "#2563eb"; }}
+  onMouseLeave={ev => { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.color = "#cbd5e1"; }}
+><EditIcon /></button>
+
+<button
+  onClick={() => handleImpersonate(e)}
+  disabled={impersonating === e.id}
+  title="Login as this employee"
+  style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1", fontSize: 13 }}
+  onMouseEnter={ev => { ev.currentTarget.style.background = "#fdf4ff"; ev.currentTarget.style.color = "#9333ea"; }}
+  onMouseLeave={ev => { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.color = "#cbd5e1"; }}
+>
+  {impersonating === e.id ? "…" : "👤"}
+</button>
+
+<button onClick={() => setDeleteTarget(e)} title="Remove"
+  style={{ width: 26, height: 26, borderRadius: 7, border: "none", background: "transparent", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#cbd5e1" }}
+  onMouseEnter={ev => { ev.currentTarget.style.background = "#fef2f2"; ev.currentTarget.style.color = "#dc2626"; }}
+  onMouseLeave={ev => { ev.currentTarget.style.background = "transparent"; ev.currentTarget.style.color = "#cbd5e1"; }}
+><TrashIcon /></button>
                       </>
                     )}
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10, paddingRight: 60 }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 10, paddingRight: 90 }}>
                     <Avatar initials={e.avatar} size={38} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: "#0f172a", marginBottom: 1 }}>{e.name}</div>

@@ -3,6 +3,7 @@ const jwt               = require("jsonwebtoken");
 const crypto            = require("crypto");
 const User              = require("../models/User");
 const { protect }       = require("../middleware/auth");
+const { adminOnly }     = require("../middleware/roleCheck");
 const { sendOTPEmail }  = require("../services/emailService");
 
 const router = express.Router();
@@ -51,16 +52,15 @@ router.get("/me", protect, async (req, res) => {
   res.json(req.user);
 });
 
-// POST /api/auth/forgot-password — send OTP
+// POST /api/auth/forgot-password
 router.post("/forgot-password", async (req, res) => {
   try {
     const { email } = req.body;
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "No account found with this email." });
 
-    // Generate 6-digit OTP
     const otp    = crypto.randomInt(100000, 999999).toString();
-    const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiry = new Date(Date.now() + 10 * 60 * 1000);
 
     user.resetOTP       = otp;
     user.resetOTPExpiry = expiry;
@@ -74,21 +74,21 @@ router.post("/forgot-password", async (req, res) => {
   }
 });
 
-// POST /api/auth/verify-otp — verify OTP
+// POST /api/auth/verify-otp
 router.post("/verify-otp", async (req, res) => {
   try {
     const { email, otp } = req.body;
     const user = await User.findOne({ email });
-    if (!user)                              return res.status(404).json({ message: "User not found." });
-    if (user.resetOTP !== otp)              return res.status(400).json({ message: "Invalid OTP." });
-    if (new Date() > user.resetOTPExpiry)   return res.status(400).json({ message: "OTP expired. Request a new one." });
+    if (!user)                            return res.status(404).json({ message: "User not found." });
+    if (user.resetOTP !== otp)            return res.status(400).json({ message: "Invalid OTP." });
+    if (new Date() > user.resetOTPExpiry) return res.status(400).json({ message: "OTP expired. Request a new one." });
     res.json({ message: "OTP verified" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// POST /api/auth/reset-password — set new password
+// POST /api/auth/reset-password
 router.post("/reset-password", async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -103,6 +103,36 @@ router.post("/reset-password", async (req, res) => {
     await user.save();
 
     res.json({ message: "Password reset successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST /api/auth/impersonate/:employeeId — admin only
+router.post("/impersonate/:employeeId", protect, adminOnly, async (req, res) => {
+  try {
+    const employee = await User.findById(req.params.employeeId).select("-password");
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
+    if (employee.role === "admin") return res.status(400).json({ message: "Cannot impersonate another admin" });
+
+    const token = generateToken(employee._id);
+
+    res.json({
+      token,
+      user: {
+        id:       employee._id,
+        name:     `${employee.firstName} ${employee.lastName}`,
+        email:    employee.email,
+        initials: `${employee.firstName[0]}${employee.lastName[0]}`.toUpperCase(),
+        role:     employee.role,
+        image:    employee.image || "",
+      },
+      impersonatedBy: {
+        id:    req.user._id,
+        name:  `${req.user.firstName} ${req.user.lastName}`,
+        token: req.headers.authorization?.split(" ")[1],
+      }
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
