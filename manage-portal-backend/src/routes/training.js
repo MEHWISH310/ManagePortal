@@ -36,4 +36,15 @@ router.delete("/:id", protect, adminOnly, async (req, res) => {
   }
 });
 
+// PUT /api/training/:id — admin edits
+router.put("/:id", protect, adminOnly, async (req, res) => {
+  try {
+    const training = await Training.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!training) return res.status(404).json({ message: "Training not found" });
+    res.json(training);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

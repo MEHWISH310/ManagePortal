@@ -114,4 +114,19 @@ router.get("/enrolled/:trainingId", protect, adminOnly, async (req, res) => {
   }
 });
 
+// POST /api/payment/mark-failed
+router.post("/mark-failed", protect, async (req, res) => {
+  try {
+    const { razorpayOrderId, reason } = req.body;
+    await Payment.findOneAndUpdate(
+      { razorpayOrderId },
+      { status: "failed" },
+      { new: true }
+    );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;
