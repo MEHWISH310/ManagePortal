@@ -2,11 +2,15 @@ const User         = require("../models/User");
 const Leave        = require("../models/Leave");
 const Task         = require("../models/Task");
 const Announcement = require("../models/Announcement");
+const Training     = require("../models/Training");
+const Notification = require("../models/Notification");
+const Payment      = require("../models/Payment");
 const { parseQuery } = require("../services/openaiService");
 
-// Build a Mongo filter object for the User collection from AI filters
+// ── User filter builder ───────────────────────────────────────────────────────
 function buildUserFilter(f) {
-  const q = { deleted: { $ne: true } };
+  // if explicitly asking for deleted employees, show them; otherwise exclude
+  const q = f.deleted ? { deleted: true } : { deleted: { $ne: true } };
   if (f.status)        q.status        = f.status;
   if (f.role)          q.role          = f.role;
   if (f.dept)          q.dept          = new RegExp(`^${f.dept}$`, "i");
@@ -21,106 +25,142 @@ function buildUserFilter(f) {
     if (f.minSalary) q.salary.$gte = f.minSalary;
     if (f.maxSalary) q.salary.$lte = f.maxSalary;
   }
-  // Name filter — matches firstName, lastName, or full name
   if (f.name) {
     q.$or = [
       { firstName: new RegExp(f.name, "i") },
       { lastName:  new RegExp(f.name, "i") },
-      { $expr: { $regexMatch: { input: { $concat: ["$firstName", " ", "$lastName"] }, regex: f.name, options: "i" } } }
+      { $expr: { $regexMatch: { input: { $concat: ["$firstName", " ", "$lastName"] }, regex: f.name, options: "i" } } },
     ];
   }
   return q;
 }
 
+// ── Module runners ────────────────────────────────────────────────────────────
 async function runUsersQuery(filters) {
-  const q = buildUserFilter(filters);
-  const users = await User.find(q).select("-password").limit(50);
-  return users;
+  return User.find(buildUserFilter(filters)).select("-password").limit(50);
 }
 
 async function runPayrollQuery(filters) {
-  const q = buildUserFilter(filters);
-  const users = await User.find(q).select("firstName lastName email dept salary payrollStatus").limit(50);
-  return users;
+  return User.find(buildUserFilter(filters))
+    .select("firstName lastName email dept salary payrollStatus")
+    .limit(50);
 }
 
 async function runLeavesQuery(filters) {
-  const leaveMatch = {};
-  if (filters.status) leaveMatch.status = filters.status;
-  if (filters.type)   leaveMatch.type   = filters.type;
+  const match = {};
+  if (filters.status)   match.status = filters.status;
+  if (filters.type)     match.type   = filters.type;
   if (filters.fromDate || filters.toDate) {
-    leaveMatch.from = {};
-    if (filters.fromDate) leaveMatch.from.$gte = filters.fromDate;
-    if (filters.toDate)   leaveMatch.from.$lte = filters.toDate;
+    match.from = {};
+    if (filters.fromDate) match.from.$gte = filters.fromDate;
+    if (filters.toDate)   match.from.$lte = filters.toDate;
   }
 
-  let leaves = await Leave.find(leaveMatch)
+  let leaves = await Leave.find(match)
     .populate("employeeId", "firstName lastName email dept")
     .limit(100);
 
-  // dept filter after populate
   if (filters.dept) {
-    const deptRegex = new RegExp(`^${filters.dept}$`, "i");
-    leaves = leaves.filter(l => l.employeeId && deptRegex.test(l.employeeId.dept || ""));
+    const rx = new RegExp(`^${filters.dept}$`, "i");
+    leaves = leaves.filter(l => l.employeeId && rx.test(l.employeeId.dept || ""));
   }
-
-  // name filter after populate
   if (filters.name) {
-    const nameRegex = new RegExp(filters.name, "i");
+    const rx = new RegExp(filters.name, "i");
     leaves = leaves.filter(l => {
       if (!l.employeeId) return false;
       const full = `${l.employeeId.firstName} ${l.employeeId.lastName}`;
-      return nameRegex.test(full) || nameRegex.test(l.employeeId.firstName) || nameRegex.test(l.employeeId.lastName);
+      return rx.test(full) || rx.test(l.employeeId.firstName) || rx.test(l.employeeId.lastName);
     });
   }
-
   return leaves.slice(0, 50);
 }
 
 async function runTasksQuery(filters) {
-  const taskMatch = {};
-  if (filters.priority) taskMatch.priority = filters.priority;
-  if (typeof filters.done === "boolean") taskMatch.done = filters.done;
-  if (filters.tag) taskMatch.tag = new RegExp(`^${filters.tag}$`, "i");
+  const match = {};
+  if (filters.priority)              match.priority = filters.priority;
+  if (typeof filters.done === "boolean") match.done = filters.done;
+  if (filters.tag)                   match.tag = new RegExp(`^${filters.tag}$`, "i");
 
-  let tasks = await Task.find(taskMatch)
+  let tasks = await Task.find(match)
     .populate("userId", "firstName lastName email dept")
     .limit(100);
 
-  // dept filter after populate
   if (filters.dept) {
-    const deptRegex = new RegExp(`^${filters.dept}$`, "i");
-    tasks = tasks.filter(t => t.userId && deptRegex.test(t.userId.dept || ""));
+    const rx = new RegExp(`^${filters.dept}$`, "i");
+    tasks = tasks.filter(t => t.userId && rx.test(t.userId.dept || ""));
   }
-
-  // name filter after populate — "tasks of test employee"
   if (filters.name) {
-    const nameRegex = new RegExp(filters.name, "i");
+    const rx = new RegExp(filters.name, "i");
     tasks = tasks.filter(t => {
       if (!t.userId) return false;
       const full = `${t.userId.firstName} ${t.userId.lastName}`;
-      return nameRegex.test(full) || nameRegex.test(t.userId.firstName) || nameRegex.test(t.userId.lastName);
+      return rx.test(full) || rx.test(t.userId.firstName) || rx.test(t.userId.lastName);
     });
   }
-
   return tasks.slice(0, 50);
 }
 
 async function runAnnouncementsQuery(filters) {
   const match = {};
-  // filter by title/content keyword if name is provided
-  if (filters.name) {
+  if (filters.keyword) {
     match.$or = [
-      { title:   new RegExp(filters.name, "i") },
-      { content: new RegExp(filters.name, "i") },
+      { title:   new RegExp(filters.keyword, "i") },
+      { content: new RegExp(filters.keyword, "i") },
     ];
   }
-  const announcements = await Announcement.find(match)
-    .sort({ createdAt: -1 })
-    .limit(20);
-  return announcements;
+  return Announcement.find(match).sort({ createdAt: -1 }).limit(20);
 }
 
+async function runTrainingQuery(filters) {
+  const match = {};
+  if (filters.keyword) {
+    match.$or = [
+      { title:       new RegExp(filters.keyword, "i") },
+      { description: new RegExp(filters.keyword, "i") },
+    ];
+  }
+  return Training.find(match).sort({ createdAt: -1 }).limit(20);
+}
+
+async function runNotificationsQuery(filters, userId) {
+  // recipient: null means broadcast to all, or specific user
+  const match = {
+    $or: [
+      { recipient: null },
+      ...(userId ? [{ recipient: userId }] : []),
+    ]
+  };
+  return Notification.find(match)
+    .populate("createdBy", "firstName lastName")
+    .sort({ createdAt: -1 })
+    .limit(20);
+}
+
+async function runEnrolledQuery(filters) {
+  // filters.trainingKeyword — search training by name
+  let trainingIds = null;
+  if (filters.trainingKeyword) {
+    const trainings = await Training.find({
+      $or: [
+        { title:       new RegExp(filters.trainingKeyword, "i") },
+        { description: new RegExp(filters.trainingKeyword, "i") },
+      ]
+    }).select("_id");
+    trainingIds = trainings.map(t => t._id);
+  }
+
+  const paymentMatch = { status: "paid" };
+  if (trainingIds) paymentMatch.trainingId = { $in: trainingIds };
+
+  const payments = await Payment.find(paymentMatch)
+    .populate("userId",     "firstName lastName email dept jobTitle status")
+    .populate("trainingId", "title price date")
+    .limit(50);
+
+  return payments;
+}
+
+// ── Main handler ──────────────────────────────────────────────────────────────
 exports.handleAiQuery = async (req, res) => {
   try {
     const { query } = req.body;
@@ -147,6 +187,15 @@ exports.handleAiQuery = async (req, res) => {
         break;
       case "announcements":
         results = await runAnnouncementsQuery(filters || {});
+        break;
+      case "training":
+        results = await runTrainingQuery(filters || {});
+        break;
+      case "notifications":
+        results = await runNotificationsQuery(filters || {}, req.user?._id);
+        break;
+      case "enrolled":
+        results = await runEnrolledQuery(filters || {});
         break;
       default:
         return res.json({ module: null, summary: summary || "I couldn't understand that request.", results: [] });

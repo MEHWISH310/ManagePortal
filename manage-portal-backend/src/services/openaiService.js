@@ -7,80 +7,88 @@ You are a query-parsing assistant for an HR management system called ManagePorta
 Your ONLY job is to convert a natural-language request into a structured JSON object.
 NEVER reply with explanations, markdown, or extra text — ONLY raw JSON.
 
-The system has these modules and fields:
+Modules and fields:
 
-1. module: "users"   (Employees)
-   filters can include:
-   - status: "Active" | "On Leave" | "Inactive"
-   - role: "admin" | "employee"
-   - dept: string (e.g. "HR", "Engineering", "Finance", "Design", "Sales", "Marketing", "Operations", "Product Management", "General")
-   - payrollStatus: "Paid" | "Pending" | "On Hold"
-   - joinedAfter: ISO date string
-   - joinedBefore: ISO date string
+1. module: "users" — Employees
+   filters: status ("Active"|"On Leave"|"Inactive"), role ("admin"|"employee"), dept, payrollStatus ("Paid"|"Pending"|"On Hold"), joinedAfter, joinedBefore (ISO dates), name (string)
 
 2. module: "leaves"
-   filters can include:
-   - status: "Pending" | "Approved" | "Rejected"
-   - type: "Casual" | "Medical" | "Earned"
-   - dept: string
-   - fromDate / toDate: ISO date strings
+   filters: status ("Pending"|"Approved"|"Rejected"), type ("Casual"|"Medical"|"Earned"), dept, fromDate, toDate, name
 
 3. module: "tasks"
-   filters can include:
-   - done: true | false
-   - priority: "High" | "Medium" | "Low"
-   - tag: string
-   - dept: string
+   filters: done (bool), priority ("High"|"Medium"|"Low"), tag, dept, name
 
 4. module: "payroll"
-   filters can include:
-   - payrollStatus: "Paid" | "Pending" | "On Hold"
-   - dept: string
-   - minSalary: number
-   - maxSalary: number
+   filters: payrollStatus ("Paid"|"Pending"|"On Hold"), dept, minSalary, maxSalary, name
+
+5. module: "announcements"
+   filters: keyword (string — search in title/content)
+
+6. module: "training"
+   filters: keyword (string — search in title/description)
+
+7. module: "notifications"
+   filters: (none — returns recent notifications)
 
 Always respond in this exact JSON shape:
 {
-  "module": "users" | "leaves" | "tasks" | "payroll",
+  "module": "users"|"leaves"|"tasks"|"payroll"|"announcements"|"training"|"notifications",
   "filters": { ...only relevant keys... },
-  "summary": "a short, friendly one-line description of what you searched for"
+  "summary": "short friendly one-line description"
 }
 
 Today's date is ${new Date().toISOString().slice(0, 10)}.
 
-If the request is ambiguous or doesn't match any module, respond with:
-{ "module": null, "filters": {}, "summary": "I couldn't understand that request." }
+If ambiguous or no match: { "module": null, "filters": {}, "summary": "I couldn't understand that request." }
 `;
 
-// ── LOCAL FALLBACK — keyword-based parser (no OpenAI needed) ──────────────────
+// ── GENERIC WORDS — never treated as a person's name ─────────────────────────
+const GENERIC = /^(all|the|me|my|a|an|is|in|on|at|to|of|for|by|show|list|get|fetch|find|display|give|tell|what|who|which|how|inactive|active|deleted|removed|employees?|payroll|leaves?|tasks?|announcements?|training|notifications?|pending|approved|rejected|done|paid|unpaid|high|medium|low|casual|medical|earned|recent|new|latest|this|year|month|week|day|today|management|engineering|hr|finance|design|sales|marketing|operations|general)$/i;
+
+function isGeneric(word) { return GENERIC.test(word.trim()); }
+function extractName(q) {
+  const patterns = [
+    /(?:of|for|by|named?|called?)\s+([a-z][a-z\s]{1,40})$/i,
+    /(?:of|for|by|named?|called?)\s+([a-z][a-z\s]{1,30}?)(?:\s+(?:in|from|with|who|and|\bin\b))/i,
+    /^show\s+(?:me\s+|the\s+)?([a-z]+\s+[a-z]+)(?:'s)?(?:\s+payroll|\s+salary|\s+leaves?|\s+tasks?|\s+profile)?$/i,
+    /^find\s+([a-z]+(?:\s+[a-z]+)?)$/i,
+  ];
+  for (const p of patterns) {
+    const m = q.match(p);
+    if (m && m[1]) {
+      const name = m[1].trim();
+      const words = name.split(/\s+/);
+      if (words.length > 0 && !words.every(isGeneric)) return name;
+    }
+  }
+  return null;
+}
+
+// ── LOCAL FALLBACK ────────────────────────────────────────────────────────────
 function localFallbackParser(query) {
-  const q = query.toLowerCase();
+  const q = query.toLowerCase().trim();
   const today = new Date();
   const filters = {};
   let module = null;
   let summary = "";
 
-  // ── Detect module (order matters — most specific first) ──
-  const isAnnouncement = /\bannouncement|notice|news|post/.test(q);
-  const isLeave        = /\bleave|casual|medical|earned/.test(q);
-  const isTask         = /\btask/.test(q);
-  const isPayroll      = /\bpayroll|salary/.test(q);
+  // ── Detect module — most specific first ──
+  if (/deleted.employ|removed.employ|employ.*deleted/.test(q)) { module = "users"; filters.deleted = true; }
+  else if (/enrolled|who (?:paid|joined|registered).*training|employees.*training|training.*employees/.test(q)) module = "enrolled";
+  else if (/\bnotification/.test(q))                     module = "notifications";
+  else if (/\bannouncement|notice|\bnews\b/.test(q)) module = "announcements";
+  else if (/\btraining|course|workshop/.test(q))     module = "training";
+  else if (/\bleave|casual|medical|earned/.test(q))  module = "leaves";
+  else if (/\btask/.test(q))                         module = "tasks";
+  else if (/\bpayroll|salary/.test(q))               module = "payroll";
+  else                                                module = "users";
 
-  if (isAnnouncement) module = "announcements";
-  else if (isLeave)   module = "leaves";
-  else if (isTask)    module = "tasks";
-  else if (isPayroll) module = "payroll";
-  else                module = "users"; // default — employees
+  // ── User status ──
+  if (/\binactive\b/.test(q))                                        { module = "users"; filters.status = "Inactive"; }
+  if (/\bon leave\b/.test(q) && module !== "leaves")                 { module = "users"; filters.status = "On Leave"; }
+  if (/\bonly active\b|\bactive employees\b|\bactive staff\b/.test(q)) { module = "users"; filters.status = "Active"; }
 
-  // ── User status — only when clearly about employees ──
-  if (/\binactive\b/.test(q))  { module = "users"; filters.status = "Inactive"; }
-  if (/\bon leave\b/.test(q))  { module = "users"; filters.status = "On Leave"; }
-  // "show active employees" — only set Active if "active" is explicit AND no other status set
-  if (/\bonly active\b|\bactive employees\b|\bactive staff\b/.test(q)) {
-    module = "users"; filters.status = "Active";
-  }
-
-  // ── Leave status ──
+  // ── Leave filters ──
   if (module === "leaves") {
     if (/\bpending\b/.test(q))  filters.status = "Pending";
     if (/\bapproved\b/.test(q)) filters.status = "Approved";
@@ -92,27 +100,29 @@ function localFallbackParser(query) {
 
   // ── Task filters ──
   if (module === "tasks") {
-    if (/\bcompleted\b|\bdone\b/.test(q))    filters.done     = true;
-    if (/\bpending\b|\bnot done\b/.test(q))  filters.done     = false;
-    if (/\bhigh\b/.test(q))                  filters.priority = "High";
-    if (/\bmedium\b/.test(q))                filters.priority = "Medium";
-    if (/\blow\b/.test(q))                   filters.priority = "Low";
+    if (/\bcompleted\b|\bdone\b/.test(q))   filters.done     = true;
+    if (/\bpending\b|\bnot done\b/.test(q)) filters.done     = false;
+    if (/\bhigh\b/.test(q))                 filters.priority = "High";
+    if (/\bmedium\b/.test(q))               filters.priority = "Medium";
+    if (/\blow\b/.test(q))                  filters.priority = "Low";
   }
 
   // ── Payroll filters ──
   if (module === "payroll") {
-    if (/\bunpaid\b|\bpending\b/.test(q))  filters.payrollStatus = "Pending";
-    if (/\bpaid\b/.test(q))                filters.payrollStatus = "Paid";
-    if (/\bon hold\b/.test(q))             filters.payrollStatus = "On Hold";
+    if (/\bunpaid\b|\bpending\b/.test(q)) filters.payrollStatus = "Pending";
+    if (/\bpaid\b/.test(q))               filters.payrollStatus = "Paid";
+    if (/\bon hold\b/.test(q))            filters.payrollStatus = "On Hold";
   }
 
-  // ── Role — only when explicitly asked ──
-  // "show admins" / "list admins" — NOT triggered by "employees" or "all employees"
-  if (/\bshow admins\b|\blist admins\b|\ball admins\b|\bonly admins\b/.test(q)) {
+  // ── Role — detect admin/moderator/employee queries ──
+  if (/\badmin(s)?\b/.test(q) && !/announcement|task|leave|payroll|notif/.test(q)) {
     module = "users"; filters.role = "admin";
   }
+  if (/\bmoderator(s)?\b/.test(q)) {
+    module = "users"; filters.role = "moderator";
+  }
 
-  // ── Department detection — order matters (specific/longer first) ──
+  // ── Department ──
   const deptMap = [
     ["product management", "Product Management"],
     ["engineering",        "Engineering"],
@@ -125,56 +135,54 @@ function localFallbackParser(query) {
     ["management",         "Management"],
     ["general",            "General"],
   ];
-  for (const [keyword, dept] of deptMap) {
-    if (new RegExp(keyword, "i").test(q)) { filters.dept = dept; break; }
+  for (const [kw, dept] of deptMap) {
+    if (new RegExp(kw, "i").test(q)) { filters.dept = dept; break; }
   }
 
-  // ── Name filter — "of X" / "for X" / "named X" ──
-  // Matches: "payroll of test employee", "show karan sharma", "find priya"
-  const namePatterns = [
-    /(?:of|for|named?|called?)\s+([a-z][a-z\s]{1,40})$/i,           // "payroll of test employee"
-    /(?:of|for|named?|called?)\s+([a-z][a-z\s]{1,40}?)(?:\s+(?:in|from|with|who|and|))/i,
-    /^show\s+(?:me\s+)?([a-z]+\s+[a-z]+)(?:\s+payroll|\s+salary|\s+leave|\s+task)?$/i, // "show test employee"
-    /^find\s+([a-z]+(?:\s+[a-z]+)?)$/i,                              // "find priya"
-  ];
-  for (const pattern of namePatterns) {
-    const m = q.match(pattern);
-    if (m && m[1] && m[1].trim().length > 1) {
-      // exclude generic words
-      const generic = /^(all|the|me|my|inactive|active|employees?|payroll|leaves?|tasks?)$/i;
-      const name = m[1].trim();
-      if (!generic.test(name)) { filters.name = name; break; }
-    }
+  // ── Keyword filter for announcements / training / enrolled ──
+  if (module === "announcements" || module === "training") {
+    const kwMatch = q.match(/(?:about|on|regarding|related to)\s+([a-z][a-z\s]{1,40})$/i);
+    if (kwMatch) filters.keyword = kwMatch[1].trim();
+  } else if (module === "enrolled") {
+    // extract training name: "enrolled in AI training" → "AI"
+    const enrollMatch = q.match(/(?:enrolled in|paid for|registered for|joined)\s+([a-z][a-z\s]{1,40}?)(?:\s+training|\s+course|\s+workshop)?$/i)
+                     || q.match(/(?:employees?|who).*(?:in|for)\s+([a-z][a-z\s]{1,40}?)(?:\s+training|\s+course)?$/i);
+    if (enrollMatch) filters.trainingKeyword = enrollMatch[1].trim();
+  } else {
+    // ── Name filter for employees / leaves / tasks / payroll ──
+    const name = extractName(q);
+    if (name) filters.name = name;
   }
 
   // ── Date filters ──
   if (/this year|joined this year|new this year/.test(q)) {
     filters.joinedAfter  = new Date(today.getFullYear(), 0, 1).toISOString();
     filters.joinedBefore = new Date(today.getFullYear(), 11, 31).toISOString();
-    module = "users";
+    if (module === "users" || module === "payroll") {} else module = "users";
   }
   if (/this month|joined this month/.test(q)) {
     filters.joinedAfter  = new Date(today.getFullYear(), today.getMonth(), 1).toISOString();
     filters.joinedBefore = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString();
-    module = "users";
+    if (module !== "leaves") module = "users";
   }
-  if (/last 30 days|recent/.test(q)) {
+  if (/last 30 days|recent(?:ly)?/.test(q) && module === "users") {
     const d = new Date(); d.setDate(d.getDate() - 30);
     filters.joinedAfter = d.toISOString();
-    module = "users";
   }
 
   // ── Build summary ──
-  const moduleLabel = module === "users" ? "employees" : module === "announcements" ? "announcements" : module;
+  const labelMap = { users: "employees", leaves: "leaves", tasks: "tasks", payroll: "payroll", announcements: "announcements", training: "trainings", notifications: "notifications", enrolled: "enrolled employees" };
+  const moduleLabel = labelMap[module] || module;
   const parts = [];
-  if (filters.name)          parts.push(filters.name);           // name pehle
+  if (filters.name)          parts.push(filters.name);
+  if (filters.keyword)       parts.push(`"${filters.keyword}"`);
   if (filters.status)        parts.push(filters.status);
   if (filters.role)          parts.push(filters.role + "s only");
   if (filters.dept)          parts.push("dept: " + filters.dept);
   if (filters.type)          parts.push(filters.type);
   if (typeof filters.done === "boolean") parts.push(filters.done ? "completed" : "pending");
   if (filters.priority)      parts.push(filters.priority + " priority");
-  if (filters.payrollStatus) parts.push(filters.payrollStatus + " payroll");
+  if (filters.payrollStatus) parts.push(filters.payrollStatus);
   if (filters.joinedAfter)   parts.push("joined recently");
 
   summary = parts.length
@@ -184,9 +192,8 @@ function localFallbackParser(query) {
   return { module, filters, summary };
 }
 
-// ── Main export — tries OpenAI, falls back to local parser ───────────────────
+// ── Main export ───────────────────────────────────────────────────────────────
 async function parseQuery(userQuery) {
-  // Try OpenAI first
   try {
     const completion = await client.chat.completions.create({
       model: "gpt-4o-mini",
@@ -197,14 +204,10 @@ async function parseQuery(userQuery) {
       ],
       temperature: 0,
     });
-
-    const raw = completion.choices[0].message.content;
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(completion.choices[0].message.content);
     parsed._source = "openai";
     return parsed;
-
   } catch (err) {
-    // OpenAI failed (no credits, network, etc.) — use local fallback
     console.warn("[AI] OpenAI unavailable, using local fallback:", err.message);
     const parsed = localFallbackParser(userQuery);
     parsed._source = "local";
