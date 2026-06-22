@@ -24,6 +24,15 @@ const INTL_CARDS = [
   { network: "Visa",       number: "4012 8888 8888 1881" },
 ];
 
+// ── CHANGED: formatDateTime — date + time dono show karo ────────
+function formatDateTime(dateStr) {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr);
+  const date = d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true });
+  return `${date}, ${time}`;
+}
+
 // ── Export helpers ──────────────────────────────────────────────
 function exportTrainingsCSV(data) {
   const headers = ["Title", "Description", "Date", "Duration", "Price (₹)"];
@@ -58,37 +67,40 @@ function exportTrainingsPDF(data) {
   printHTML(html);
 }
 
+// ── CHANGED: exportTxnCSV — "Date & Time" column use karo ──────
 function exportTxnCSV(data, isAdmin) {
   const headers = isAdmin
-    ? ["Employee","Email","Department","Training","Training Date","Amount (₹)","Payment ID","Date","Status"]
-    : ["Training","Training Date","Duration","Amount (₹)","Payment ID","Order ID","Date","Status"];
+    ? ["Employee","Email","Department","Training","Training Date","Amount (₹)","Payment ID","Date & Time","Status"]
+    : ["Training","Training Date","Duration","Amount (₹)","Payment ID","Order ID","Date & Time","Status"];
   const rows = isAdmin
-    ? data.map(p => [`${p.userId?.firstName||""} ${p.userId?.lastName||""}`, p.userId?.email||"", p.userId?.dept||"", p.trainingId?.title||"", p.trainingId?.date||"", p.amount, p.razorpayPaymentId||"", new Date(p.createdAt).toLocaleDateString("en-IN"), p.status])
-    : data.map(p => [p.trainingId?.title||"", p.trainingId?.date||"", p.trainingId?.duration||"", p.amount, p.razorpayPaymentId||"", p.razorpayOrderId||"", new Date(p.createdAt).toLocaleDateString("en-IN"), p.status]);
+    ? data.map(p => [`${p.userId?.firstName||""} ${p.userId?.lastName||""}`, p.userId?.email||"", p.userId?.dept||"", p.trainingId?.title||"", p.trainingId?.date||"", p.amount, p.razorpayPaymentId||"", formatDateTime(p.createdAt), p.status])
+    : data.map(p => [p.trainingId?.title||"", p.trainingId?.date||"", p.trainingId?.duration||"", p.amount, p.razorpayPaymentId||"", p.razorpayOrderId||"", formatDateTime(p.createdAt), p.status]);
   const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
   download("\uFEFF" + csv, "transactions.csv", "text/csv;charset=utf-8;");
 }
 
+// ── CHANGED: exportTxnExcel — "Date & Time" column use karo ────
 function exportTxnExcel(data, isAdmin) {
   const headers = isAdmin
-    ? ["Employee","Email","Department","Training","Training Date","Amount (₹)","Payment ID","Date","Status"]
-    : ["Training","Training Date","Duration","Amount (₹)","Payment ID","Order ID","Date","Status"];
+    ? ["Employee","Email","Department","Training","Training Date","Amount (₹)","Payment ID","Date & Time","Status"]
+    : ["Training","Training Date","Duration","Amount (₹)","Payment ID","Order ID","Date & Time","Status"];
   const rows = isAdmin
-    ? data.map(p => [`${p.userId?.firstName||""} ${p.userId?.lastName||""}`, p.userId?.email||"", p.userId?.dept||"", p.trainingId?.title||"", p.trainingId?.date||"", p.amount, p.razorpayPaymentId||"", new Date(p.createdAt).toLocaleDateString("en-IN"), p.status])
-    : data.map(p => [p.trainingId?.title||"", p.trainingId?.date||"", p.trainingId?.duration||"", p.amount, p.razorpayPaymentId||"", p.razorpayOrderId||"", new Date(p.createdAt).toLocaleDateString("en-IN"), p.status]);
+    ? data.map(p => [`${p.userId?.firstName||""} ${p.userId?.lastName||""}`, p.userId?.email||"", p.userId?.dept||"", p.trainingId?.title||"", p.trainingId?.date||"", p.amount, p.razorpayPaymentId||"", formatDateTime(p.createdAt), p.status])
+    : data.map(p => [p.trainingId?.title||"", p.trainingId?.date||"", p.trainingId?.duration||"", p.amount, p.razorpayPaymentId||"", p.razorpayOrderId||"", formatDateTime(p.createdAt), p.status]);
   const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Transactions");
   XLSX.writeFile(wb, "transactions.xlsx");
 }
 
+// ── CHANGED: exportTxnPDF — "Date & Time" column use karo ──────
 function exportTxnPDF(data, isAdmin) {
   const headers = isAdmin
-    ? ["Employee","Email","Dept","Training","Tr. Date","Amount","Payment ID","Date","Status"]
-    : ["Training","Tr. Date","Duration","Amount","Payment ID","Order ID","Date","Status"];
+    ? ["Employee","Email","Dept","Training","Tr. Date","Amount","Payment ID","Date & Time","Status"]
+    : ["Training","Tr. Date","Duration","Amount","Payment ID","Order ID","Date & Time","Status"];
   const rows = isAdmin
-    ? data.map(p => [`${p.userId?.firstName||""} ${p.userId?.lastName||""}`, p.userId?.email||"", p.userId?.dept||"", p.trainingId?.title||"", p.trainingId?.date||"", `₹${p.amount}`, p.razorpayPaymentId||"—", new Date(p.createdAt).toLocaleDateString("en-IN"), p.status])
-    : data.map(p => [p.trainingId?.title||"", p.trainingId?.date||"", p.trainingId?.duration||"—", `₹${p.amount}`, p.razorpayPaymentId||"—", p.razorpayOrderId||"—", new Date(p.createdAt).toLocaleDateString("en-IN"), p.status]);
+    ? data.map(p => [`${p.userId?.firstName||""} ${p.userId?.lastName||""}`, p.userId?.email||"", p.userId?.dept||"", p.trainingId?.title||"", p.trainingId?.date||"", `₹${p.amount}`, p.razorpayPaymentId||"—", formatDateTime(p.createdAt), p.status])
+    : data.map(p => [p.trainingId?.title||"", p.trainingId?.date||"", p.trainingId?.duration||"—", `₹${p.amount}`, p.razorpayPaymentId||"—", p.razorpayOrderId||"—", formatDateTime(p.createdAt), p.status]);
   const html = `<html><head><title>Transactions</title><style>
     body{font-family:'Segoe UI',sans-serif;padding:24px;color:#0f172a}
     h2{font-size:20px;margin-bottom:16px;color:#2563eb}
@@ -322,46 +334,46 @@ export default function TrainingTab({ mode = "employee" }) {
   const isPaid = (tid) => myPayments.some(p => p.trainingId?._id === tid && p.status === "paid");
 
   const handlePay = async (training) => {
-  setPayingId(training._id);
-  try {
-    const order = await createOrder({ trainingId: training._id });
-    const options = {
-      key: order.keyId, amount: order.amount, currency: order.currency,
-      name: "ManagePortal", description: training.title, order_id: order.orderId,
-      handler: async (response) => {
+    setPayingId(training._id);
+    try {
+      const order = await createOrder({ trainingId: training._id });
+      const options = {
+        key: order.keyId, amount: order.amount, currency: order.currency,
+        name: "ManagePortal", description: training.title, order_id: order.orderId,
+        handler: async (response) => {
+          try {
+            await verifyPayment({
+              razorpayOrderId:   response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+            });
+            setSuccessMsg(`Payment successful for "${training.title}"!`);
+            await loadData();
+            setTimeout(() => setSuccessMsg(""), 4000);
+          } catch { alert("Payment verification failed."); }
+        },
+        prefill: { name: user.name || "", email: user.email || "" },
+        theme:   { color: "#2563eb" },
+      };
+
+      const rzp = new window.Razorpay(options);
+
+      rzp.on("payment.failed", async (response) => {
         try {
-          await verifyPayment({
-            razorpayOrderId:   response.razorpay_order_id,
-            razorpayPaymentId: response.razorpay_payment_id,
-            razorpaySignature: response.razorpay_signature,
+          await apiPost("/payment/mark-failed", {
+            razorpayOrderId: response.error.metadata.order_id,
+            reason:          response.error.description,
           });
-          setSuccessMsg(`Payment successful for "${training.title}"!`);
           await loadData();
-          setTimeout(() => setSuccessMsg(""), 4000);
-        } catch { alert("Payment verification failed."); }
-      },
-      prefill: { name: user.name || "", email: user.email || "" },
-      theme:   { color: "#2563eb" },
-    };
+        } catch (err) {
+          console.error("Failed to mark payment:", err);
+        }
+      });
 
-    const rzp = new window.Razorpay(options);
-
-    rzp.on("payment.failed", async (response) => {
-      try {
-        await apiPost("/payment/mark-failed", {
-          razorpayOrderId: response.error.metadata.order_id,
-          reason:          response.error.description,
-        });
-        await loadData();
-      } catch (err) {
-        console.error("Failed to mark payment:", err);
-      }
-    });
-
-    rzp.open();
-  } catch { alert("Failed to initiate payment."); }
-  finally { setPayingId(null); }
-};
+      rzp.open();
+    } catch { alert("Failed to initiate payment."); }
+    finally { setPayingId(null); }
+  };
 
   const handleAdd = async () => {
     if (!form.title || !form.date || !form.price) return;
@@ -535,7 +547,8 @@ export default function TrainingTab({ mode = "employee" }) {
             ) : (
               <div className="db-table-wrap">
                 <table className="db-table">
-                  <thead><tr><th>Employee</th><th>Email</th><th>Department</th><th>Training</th><th>Training Date</th><th>Amount</th><th>Payment ID</th><th>Date</th><th>Status</th></tr></thead>
+                  {/* CHANGED: "Date" → "Date & Time" */}
+                  <thead><tr><th>Employee</th><th>Email</th><th>Department</th><th>Training</th><th>Training Date</th><th>Amount</th><th>Payment ID</th><th>Date &amp; Time</th><th>Status</th></tr></thead>
                   <tbody>
                     {allPayments.map(p => (
                       <tr key={p._id}>
@@ -546,7 +559,13 @@ export default function TrainingTab({ mode = "employee" }) {
                         <td>{p.trainingId?.date || "—"}</td>
                         <td style={{ fontWeight: 700, color: "#2563eb" }}>₹{p.amount}</td>
                         <td style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>{p.razorpayPaymentId || "—"}</td>
-                        <td style={{ fontSize: 12 }}>{new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                        {/* CHANGED: date + time dono show karo */}
+                        <td style={{ fontSize: 12 }}>
+                          <div>{new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
+                            {new Date(p.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                          </div>
+                        </td>
                         <td>{statusBadge(p.status)}</td>
                       </tr>
                     ))}
@@ -560,7 +579,8 @@ export default function TrainingTab({ mode = "employee" }) {
             ) : (
               <div className="db-table-wrap">
                 <table className="db-table">
-                  <thead><tr><th>Training</th><th>Training Date</th><th>Duration</th><th>Amount</th><th>Payment ID</th><th>Order ID</th><th>Date</th><th>Status</th></tr></thead>
+                  {/* CHANGED: "Date" → "Date & Time" */}
+                  <thead><tr><th>Training</th><th>Training Date</th><th>Duration</th><th>Amount</th><th>Payment ID</th><th>Order ID</th><th>Date &amp; Time</th><th>Status</th></tr></thead>
                   <tbody>
                     {myPayments.map(p => (
                       <tr key={p._id}>
@@ -570,7 +590,12 @@ export default function TrainingTab({ mode = "employee" }) {
                         <td style={{ fontWeight: 700, color: "#2563eb" }}>₹{p.amount}</td>
                         <td style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>{p.razorpayPaymentId || "—"}</td>
                         <td style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>{p.razorpayOrderId || "—"}</td>
-                        <td style={{ fontSize: 12 }}>{new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                        <td style={{ fontSize: 12 }}>
+                          <div>{new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
+                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
+                            {new Date(p.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                          </div>
+                        </td>
                         <td>{statusBadge(p.status)}</td>
                       </tr>
                     ))}

@@ -5,10 +5,20 @@ const { adminOnly, selfOrAdmin } = require("../middleware/roleCheck");
 
 const router = express.Router();
 
-// GET /api/users
+// GET /api/users — active employees (deleted field missing wale bhi aayenge)
 router.get("/", protect, adminOnly, async (req, res) => {
   try {
-    const users = await User.find().select("-password");
+    const users = await User.find({ deleted: { $ne: true } }).select("-password");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// GET /api/users/deleted — MUST be before /:id route
+router.get("/deleted", protect, adminOnly, async (req, res) => {
+  try {
+    const users = await User.find({ deleted: true }).select("-password");
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -42,7 +52,6 @@ router.post("/", protect, adminOnly, async (req, res) => {
     const userObj = user.toObject();
     delete userObj.password;
 
-    // ── Emit real-time event to all admins ──
     req.io?.to("admins").emit("employee:added", {
       id:       user._id,
       name:     `${user.firstName} ${user.lastName}`,
@@ -71,7 +80,6 @@ router.put("/:id", protect, async (req, res) => {
     const user = await User.findByIdAndUpdate(req.params.id, rest, { new: true }).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ── Emit real-time update ──
     req.io?.to("admins").emit("employee:updated", {
       id:       user._id,
       name:     `${user.firstName} ${user.lastName}`,
@@ -90,16 +98,18 @@ router.put("/:id", protect, async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id
+// DELETE /api/users/:id — soft delete
 router.delete("/:id", protect, adminOnly, async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { deleted: true },
+      { new: true }
+    );
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    // ── Emit real-time delete ──
     req.io?.to("admins").emit("employee:deleted", { id: req.params.id });
-
-    res.json({ message: "User deleted" });
+    res.json({ message: "User soft-deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -133,5 +133,5 @@ export function useEmployees() {
     }
   };
 
-  return { employees, loading, error, handleAdd, handleUpdate, handleDelete };
+  return { employees, loading, error, handleAdd, handleUpdate, handleDelete, setEmployees };
 }

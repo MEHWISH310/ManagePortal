@@ -138,9 +138,6 @@ export default function Topbar({ pageTitle, initials, role, name, email, onLogou
               <button className="tp-menu-item" onClick={() => { setProfileOpen(false); onMyProfile?.(); }}>
                 <IconUser /><span>My Profile</span>
               </button>
-              <button className="tp-menu-item">
-                <IconSettings /><span>Account Settings</span>
-              </button>
               <button className="tp-menu-item" onClick={() => { setProfileOpen(false); setChangePwOpen(true); }}>
                 <IconLock /><span>Change Password</span>
               </button>

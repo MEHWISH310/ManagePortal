@@ -58,6 +58,14 @@ const TableViewIcon = () => (
   </svg>
 );
 
+// CHANGED: Restore icon for deleted employees
+const RestoreIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+  </svg>
+);
+
 const DEPTS    = ["Engineering", "HR", "Finance", "Design", "Sales", "Product Management", "Marketing", "Operations", "General"];
 const STATUSES = ["Active", "On Leave", "Inactive"];
 const ROLES    = ["admin", "moderator", "employee"];
@@ -146,7 +154,112 @@ function ExportDropdown({ data }) {
   );
 }
 
-export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onStatusChange, currentUserId, onImport, onImpersonate }) {
+// CHANGED: DeletedEmployeesSection — dropdown section for deleted employees (card view)
+function DeletedEmployeesSection({ deletedEmployees, onRestore }) {
+  const [open, setOpen] = useState(false);
+
+  if (deletedEmployees.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: "1rem", border: "1px solid #fee2e2", borderRadius: 12, overflow: "hidden" }}>
+      {/* Header — click to toggle */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 16px", background: "#fef2f2", border: "none", cursor: "pointer",
+          fontFamily: "inherit",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: "#dc2626" }}>
+            Deleted Employees
+          </span>
+          {/* Count badge */}
+          <span style={{
+            fontSize: 11, fontWeight: 700, background: "#dc2626", color: "#fff",
+            padding: "2px 8px", borderRadius: 20, minWidth: 22, textAlign: "center",
+          }}>
+            {deletedEmployees.length}
+          </span>
+        </div>
+        <span style={{ fontSize: 12, color: "#ef4444", fontWeight: 600 }}>
+          {open ? "▲ Hide" : "▼ Show"}
+        </span>
+      </button>
+
+      {/* Dropdown content */}
+      {open && (
+        <div style={{ padding: "12px 16px 16px", background: "#fff" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
+            {deletedEmployees.map(e => (
+              <div key={e.id}
+                style={{
+                  border: "1px solid #fee2e2", borderRadius: 12, padding: "1rem 1.1rem",
+                  background: "#fff5f5", position: "relative", opacity: 0.85,
+                }}
+              >
+                {/* Deleted badge */}
+                <span style={{
+                  position: "absolute", top: 8, left: 10, fontSize: 10, fontWeight: 700,
+                  background: "#fee2e2", color: "#dc2626", padding: "2px 7px", borderRadius: 20,
+                }}>
+                  Deleted
+                </span>
+
+                {/* Restore button */}
+                {onRestore && (
+                  <button
+                    onClick={() => onRestore(e.id)}
+                    title="Restore employee"
+                    style={{
+                      position: "absolute", top: 8, right: 8,
+                      display: "flex", alignItems: "center", gap: 4,
+                      fontSize: 11, fontWeight: 600, color: "#16a34a",
+                      background: "#f0fdf4", border: "1px solid #bbf7d0",
+                      borderRadius: 7, padding: "4px 9px", cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                    onMouseEnter={ev => { ev.currentTarget.style.background = "#dcfce7"; }}
+                    onMouseLeave={ev => { ev.currentTarget.style.background = "#f0fdf4"; }}
+                  >
+                    <RestoreIcon /> Restore
+                  </button>
+                )}
+
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 28, marginBottom: 10 }}>
+                  <Avatar initials={e.avatar} size={36} style={{ opacity: 0.6 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#64748b", marginBottom: 1, textDecoration: "line-through" }}>{e.name}</div>
+                    <div style={{ fontSize: 12, color: "#94a3b8" }}>{e.jobTitle || e.role}</div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: "1px solid #fee2e2", paddingTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px" }}>
+                  <div>
+                    <div style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Dept</div>
+                    <div style={{ fontSize: 12.5, color: "#94a3b8", marginTop: 1 }}>{e.dept}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Email</div>
+                    <div style={{ fontSize: 11.5, color: "#94a3b8", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{e.email}</div>
+                  </div>
+                  <div style={{ gridColumn: "1/-1" }}>
+                    <div style={{ fontSize: 10.5, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.4px" }}>Net pay</div>
+                    <div style={{ fontSize: 13, color: "#94a3b8", fontWeight: 700, marginTop: 1 }}>{e.salary ? formatSalary(e.salary) : "—"}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// CHANGED: prop `deletedEmployees` aur `onRestore` add kiye
+export default function EmployeesTab({ employees, deletedEmployees = [], onAdd, onDelete, onEdit, onStatusChange, onRestore, currentUserId, onImport, onImpersonate }) {
   const [showAddModal,  setShowAddModal]  = useState(false);
   const [deleteTarget,  setDeleteTarget]  = useState(null);
   const [selectedEmp,   setSelectedEmp]   = useState(null);
@@ -169,6 +282,12 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
 
   const hasFilters = search || deptFilter || statusFilter || roleFilter;
   const clearFilters = () => { setSearch(""); setDeptFilter(""); setStatusFilter(""); setRoleFilter(""); };
+
+  // CHANGED: combined rows for Grid view — active employees + deleted employees, flagged
+  const gridRowData = useMemo(() => [
+    ...employees.map(e => ({ ...e, isDeleted: false })),
+    ...deletedEmployees.map(e => ({ ...e, isDeleted: true })),
+  ], [employees, deletedEmployees]);
 
   const handleImpersonate = async (emp) => {
     setImpersonating(emp.id);
@@ -193,12 +312,12 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
       cellRenderer: (params) => {
         const e = params.data;
         return (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, height: "100%" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, height: "100%", opacity: e.isDeleted ? 0.55 : 1 }}>
             <div style={{ width: 28, height: 28, borderRadius: 7, background: "#2563eb", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               {e.avatar}
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", lineHeight: 1.3 }}>{e.name}</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a", lineHeight: 1.3, textDecoration: e.isDeleted ? "line-through" : "none" }}>{e.name}</div>
               <div style={{ fontSize: 11, color: "#64748b" }}>{e.jobTitle || e.role}</div>
             </div>
           </div>
@@ -261,14 +380,15 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
         return (
           <select
             value={e.status}
-            onChange={ev => { ev.stopPropagation(); if (!isSelf) onStatusChange?.(e.id, ev.target.value); }}
+            onChange={ev => { ev.stopPropagation(); if (!isSelf && !e.isDeleted) onStatusChange?.(e.id, ev.target.value); }}
             onClick={ev => ev.stopPropagation()}
-            disabled={isSelf}
+            disabled={isSelf || e.isDeleted}
             style={{
               fontSize: 11, fontWeight: 600, padding: "2px 18px 2px 7px",
               borderRadius: 20, border: "1.5px solid transparent",
-              cursor: isSelf ? "not-allowed" : "pointer",
+              cursor: (isSelf || e.isDeleted) ? "not-allowed" : "pointer",
               outline: "none", fontFamily: "inherit",
+              opacity: e.isDeleted ? 0.55 : 1,
               backgroundColor: e.status === "Active" ? "#f0fdf4" : e.status === "On Leave" ? "#fef9ec" : "#fef2f2",
               color: e.status === "Active" ? "#15803d" : e.status === "On Leave" ? "#b45309" : "#b91c1c",
               appearance: "none",
@@ -292,6 +412,21 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
       sortable: true,
       valueFormatter: (params) => params.value ? formatSalary(params.value) : "—",
     },
+    // CHANGED: new "Deleted" status column
+    {
+      headerName: "Deleted",
+      field: "isDeleted",
+      minWidth: 110,
+      maxWidth: 110,
+      sortable: true,
+      filter: false,
+      floatingFilter: false,
+      cellRenderer: (params) => (
+        params.value
+          ? <span style={{ fontSize: 11, fontWeight: 700, background: "#fee2e2", color: "#dc2626", padding: "2px 9px", borderRadius: 20 }}>Deleted</span>
+          : <span style={{ fontSize: 11, fontWeight: 600, background: "#f0fdf4", color: "#15803d", padding: "2px 9px", borderRadius: 20 }}>Active</span>
+      ),
+    },
     {
       headerName: "Actions",
       minWidth: 110,
@@ -303,6 +438,19 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
       cellRenderer: (params) => {
         const e = params.data;
         const isSelf = e.id === currentUserId;
+
+        // CHANGED: deleted rows just show a Restore button
+        if (e.isDeleted) {
+          return (
+            <button onClick={() => onRestore?.(e.id)} title="Restore employee"
+              style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, fontWeight: 600, color: "#16a34a", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 7, padding: "4px 9px", cursor: "pointer", fontFamily: "inherit" }}
+              onMouseEnter={ev => { ev.currentTarget.style.background = "#dcfce7"; }}
+              onMouseLeave={ev => { ev.currentTarget.style.background = "#f0fdf4"; }}>
+              <RestoreIcon /> Restore
+            </button>
+          );
+        }
+
         if (isSelf) return <span style={{ fontSize: 10, fontWeight: 600, color: "#2563eb", background: "#eff6ff", padding: "2px 7px", borderRadius: 20 }}>You</span>;
         return (
           <div style={{ display: "flex", gap: 4, alignItems: "center", height: "100%" }}>
@@ -328,7 +476,7 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
         );
       },
     },
-  ], [currentUserId, impersonating, onEdit, onStatusChange]);
+  ], [currentUserId, impersonating, onEdit, onStatusChange, onRestore]);
 
   const defaultColDef = useMemo(() => ({
     sortable:        true,
@@ -338,6 +486,7 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
 
   const onRowClicked = useCallback((params) => {
     if (params.event.target.closest("button") || params.event.target.closest("select")) return;
+    if (params.data?.isDeleted) return; // CHANGED: don't open detail modal for deleted rows
     setSelectedEmp(params.data);
   }, []);
 
@@ -510,7 +659,7 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
           <div className="ag-theme-quartz" style={{ height: 600, width: "100%" }}>
             <AgGridReact
               ref={gridRef}
-              rowData={employees}
+              rowData={gridRowData}
               columnDefs={columnDefs}
               defaultColDef={defaultColDef}
               onRowClicked={onRowClicked}
@@ -527,6 +676,14 @@ export default function EmployeesTab({ employees, onAdd, onDelete, onEdit, onSta
               getRowId={(params) => params.data.id}
             />
           </div>
+        )}
+
+        {/* Deleted Employees Section — both views, below the table/cards */}
+        {viewMode === "card" && (
+        <DeletedEmployeesSection
+          deletedEmployees={deletedEmployees}
+          onRestore={onRestore}
+        />
         )}
       </div>
 

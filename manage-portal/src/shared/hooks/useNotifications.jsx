@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import { fetchNotifications, markRead, markAllRead, addNotification, deleteNotification } from "../api/notificationsApi";
 
-export function useNotifications() {
+const NotificationsContext = createContext(null);
+
+export function NotificationsProvider({ children }) {
   const [notifs,  setNotifs]  = useState([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
@@ -42,5 +44,17 @@ export function useNotifications() {
     } catch (err) { console.error(err); }
   };
 
-  return { notifs, loading, error, handleMarkRead, handleMarkAll, handleAdd, handleDelete };
+  const value = { notifs, loading, error, handleMarkRead, handleMarkAll, handleAdd, handleDelete };
+
+  return (
+    <NotificationsContext.Provider value={value}>
+      {children}
+    </NotificationsContext.Provider>
+  );
+}
+
+export function useNotifications() {
+  const ctx = useContext(NotificationsContext);
+  if (!ctx) throw new Error("useNotifications must be used within NotificationsProvider");
+  return ctx;
 }

@@ -77,7 +77,7 @@ router.post("/verify", protect, async (req, res) => {
 router.get("/my-payments", protect, async (req, res) => {
   try {
     const payments = await Payment.find({ userId: req.user._id })
-      .populate("trainingId", "title date price")
+      .populate("trainingId", "title date price duration")
       .populate("userId", "firstName lastName email")
       .sort({ createdAt: -1 });
     res.json(payments);

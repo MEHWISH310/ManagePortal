@@ -13,6 +13,7 @@ import TrainingTab              from "../features/training/TrainingTab";
 import { fetchUser }            from "../shared/api/usersApi";
 import { apiGet }               from "../shared/api/apiClient";
 import { GridIcon, LogoutIcon } from "../shared/icons/icons";
+import { NotificationsProvider } from "../shared/hooks/useNotifications";
 
 const NAV = [
   { id: "overview",      path: "overview",      label: "My Dashboard"  },
@@ -113,6 +114,7 @@ export default function EmployeeDashboard({ onLogout }) {
         </div>
       )}
 
+      <NotificationsProvider>
       <div className="db-root" style={{ flex: 1, minHeight: isImpersonating ? "calc(100vh - 37px)" : "100vh" }}>
         <aside className="db-sidebar">
           <div className="db-sidebar-top">
@@ -182,6 +184,7 @@ export default function EmployeeDashboard({ onLogout }) {
           </div>
         </div>
       </div>
+      </NotificationsProvider>
     </>
   );
 }

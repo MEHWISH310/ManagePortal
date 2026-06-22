@@ -5,6 +5,7 @@ import Avatar        from "../../shared/ui/Avatar";
 import { formatSalary } from "../../shared/utils/formatSalary";
 import { fetchPayroll, updatePayrollStatus } from "../../shared/api/payrollApi";
 import { MY_PAYSLIPS } from "../../shared/data/chartData.jsx";
+import Spinner from "../../shared/ui/Spinner";
 
 const WalletIcon  = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 3H8L6 7h12z"/><circle cx="17" cy="14" r="1"/></svg>);
 const CalIcon     = () => (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>);
@@ -38,7 +39,7 @@ function AdminPayroll() {
     }
   };
 
-  if (loading) return <div style={{ padding: "2rem", color: "#94a3b8" }}>Loading payroll...</div>;
+  if (loading) return <Spinner text="Loading payslips..." />;
   if (error)   return <div style={{ padding: "2rem", color: "#dc2626" }}>Error: {error}</div>;
 
   const totalDisbursed = payroll.reduce((sum, e) => sum + (e.salary || 0), 0);
@@ -119,7 +120,7 @@ function EmployeePayslips() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding: "2rem", color: "#94a3b8" }}>Loading payslips...</div>;
+  if (loading) return <Spinner text="Loading payslips..." />;
   if (error)   return <div style={{ padding: "2rem", color: "#dc2626" }}>Error: {error}</div>;
 
   const me = payroll[0];

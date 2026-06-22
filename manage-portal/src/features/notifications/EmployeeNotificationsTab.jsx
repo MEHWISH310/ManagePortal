@@ -2,6 +2,7 @@ import { useState } from "react";
 import SectionHeader from "../../shared/ui/SectionHeader";
 import { useNotifications } from "../../shared/hooks/useNotifications";
 import { LeaveIcon, MegaphoneIcon, PayrollIcon, TaskIcon, AlertIcon } from "../../shared/icons/icons";
+import Spinner from "../../shared/ui/Spinner"; 
 
 const ICON_CLS    = { leave: "tp-icon-leave", announce: "tp-icon-announce", payroll: "tp-icon-payroll", task: "tp-icon-task", system: "tp-icon-system" };
 const NOTIF_ICONS = { leave: LeaveIcon, announce: MegaphoneIcon, payroll: PayrollIcon, task: TaskIcon, system: AlertIcon };
@@ -14,7 +15,7 @@ export default function EmployeeNotificationsTab() {
   const unread   = notifs.filter(n => n.unread).length;
   const filtered = filter === "All" ? notifs : notifs.filter(n => n.type === filter);
 
-  if (loading) return <div style={{ padding: "2rem", color: "#94a3b8" }}>Loading notifications...</div>;
+  if (loading) return <Spinner text="Loading notifications..." />;
   if (error)   return <div style={{ padding: "2rem", color: "#dc2626" }}>Error: {error}</div>;
 
   return (

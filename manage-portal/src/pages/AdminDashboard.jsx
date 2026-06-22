@@ -17,6 +17,7 @@ import { useEmployees }      from "../shared/hooks/useEmployees";
 import { fetchUser }         from "../shared/api/usersApi";
 import { apiGet }            from "../shared/api/apiClient";
 import { GridIcon, LogoutIcon } from "../shared/icons/icons";
+import { NotificationsProvider } from "../shared/hooks/useNotifications";
 
 const NAV = [
   { id: "overview",      path: "overview",      label: "Overview"       },
@@ -34,18 +35,63 @@ export default function AdminDashboard({ onLogout, onImpersonate }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [showImport,   setShowImport]   = useState(false);
-  const [editEmployee, setEditEmployee] = useState(null);
-  const [myProfile,    setMyProfile]    = useState(null);
-  const [notifs,       setNotifs]       = useState([]);
+  const [showImport,        setShowImport]        = useState(false);
+  const [editEmployee,      setEditEmployee]      = useState(null);
+  const [myProfile,         setMyProfile]         = useState(null);
+  const [notifs,            setNotifs]            = useState([]);
+  // CHANGED: deleted employees ki alag state
+  const [deletedEmployees,  setDeletedEmployees]  = useState([]);
 
-  const { employees, loading, error, handleAdd, handleDelete, handleUpdate } = useEmployees();
+  const { employees, loading, error, handleAdd, handleDelete, handleUpdate, setEmployees  } = useEmployees();
 
   useEffect(() => {
     apiGet("/notifications")
       .then(data => setNotifs(Array.isArray(data) ? data : []))
       .catch(() => setNotifs([]));
   }, []);
+
+  // CHANGED: startup pe deleted employees bhi fetch karo
+  useEffect(() => {
+    apiGet("/users/deleted")
+      .then(data => {
+        if (!Array.isArray(data)) return;
+        setDeletedEmployees(data.map(u => ({
+          id:       u._id,
+          name:     `${u.firstName} ${u.lastName}`,
+          email:    u.email,
+          phone:    u.phone,
+          dept:     u.dept,
+          jobTitle: u.jobTitle,
+          role:     u.role,
+          status:   u.status,
+          salary:   u.salary,
+          avatar:   `${u.firstName[0]}${u.lastName[0]}`.toUpperCase(),
+        })));
+      })
+      .catch(() => {});
+  }, []);
+
+  // CHANGED: delete ke baad employee ko deletedEmployees mein move karo
+  const handleSoftDelete = (id) => {
+    const emp = employees.find(e => e.id === id);
+    handleDelete(id); // useEmployees ka original handler — API call + employees se remove
+    if (emp) setDeletedEmployees(prev => [...prev, emp]);
+  };
+
+  // CHANGED: restore handler
+  const handleRestore = async (id) => {
+  try {
+    const { apiPut } = await import("../shared/api/apiClient");
+    await apiPut(`/users/${id}`, { deleted: false });
+    const emp = deletedEmployees.find(e => e.id === id);
+    setDeletedEmployees(prev => prev.filter(e => e.id !== id));
+    if (emp) {
+      setEmployees(prev => [{ ...emp, status: emp.status || "Active" }, ...prev]);
+    }
+  } catch {
+    alert("Failed to restore employee.");
+  }
+};
 
   const currentPath = location.pathname.replace("/admin/", "").replace("/admin", "") || "overview";
   const activeLabel = editEmployee
@@ -122,6 +168,7 @@ export default function AdminDashboard({ onLogout, onImpersonate }) {
   };
 
   return (
+    <NotificationsProvider>
     <div className="db-root">
       <aside className="db-sidebar">
         <div className="db-sidebar-top">
@@ -184,15 +231,17 @@ export default function AdminDashboard({ onLogout, onImpersonate }) {
                   ) : (
                     <EmployeesTab
                       employees={employees}
+                      deletedEmployees={deletedEmployees}
                       onAdd={handleAdd}
-                      onDelete={handleDelete}
+                      onDelete={handleSoftDelete}
+                      onRestore={handleRestore}
                       onEdit={(e) => setEditEmployee({ ...e, isAdmin: true })}
                       onStatusChange={(id, status) => handleUpdate({ ...employees.find(e => e.id === id), status })}
                       currentUserId={user.id}
                       onImport={() => setShowImport(true)}
                       onImpersonate={onImpersonate}
                     />
-                )
+                  )
                 }
               />
               <Route
@@ -214,5 +263,6 @@ export default function AdminDashboard({ onLogout, onImpersonate }) {
         </div>
       </div>
     </div>
+    </NotificationsProvider>
   );
 }
