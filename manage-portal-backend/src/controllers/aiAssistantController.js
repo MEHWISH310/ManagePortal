@@ -1,14 +1,15 @@
-const User   = require("../models/User");
-const Leave  = require("../models/Leave");
-const Task   = require("../models/Task");
+const User         = require("../models/User");
+const Leave        = require("../models/Leave");
+const Task         = require("../models/Task");
+const Announcement = require("../models/Announcement");
 const { parseQuery } = require("../services/openaiService");
 
 // Build a Mongo filter object for the User collection from AI filters
 function buildUserFilter(f) {
-  const q = { deleted: false };
+  const q = { deleted: { $ne: true } };
   if (f.status)        q.status        = f.status;
   if (f.role)          q.role          = f.role;
-  if (f.dept)           q.dept          = new RegExp(`^${f.dept}$`, "i");
+  if (f.dept)          q.dept          = new RegExp(`^${f.dept}$`, "i");
   if (f.payrollStatus) q.payrollStatus = f.payrollStatus;
   if (f.joinedAfter || f.joinedBefore) {
     q.createdAt = {};
@@ -20,6 +21,14 @@ function buildUserFilter(f) {
     if (f.minSalary) q.salary.$gte = f.minSalary;
     if (f.maxSalary) q.salary.$lte = f.maxSalary;
   }
+  // Name filter — matches firstName, lastName, or full name
+  if (f.name) {
+    q.$or = [
+      { firstName: new RegExp(f.name, "i") },
+      { lastName:  new RegExp(f.name, "i") },
+      { $expr: { $regexMatch: { input: { $concat: ["$firstName", " ", "$lastName"] }, regex: f.name, options: "i" } } }
+    ];
+  }
   return q;
 }
 
@@ -30,7 +39,6 @@ async function runUsersQuery(filters) {
 }
 
 async function runPayrollQuery(filters) {
-  // payroll lives on the User model
   const q = buildUserFilter(filters);
   const users = await User.find(q).select("firstName lastName email dept salary payrollStatus").limit(50);
   return users;
@@ -50,10 +58,20 @@ async function runLeavesQuery(filters) {
     .populate("employeeId", "firstName lastName email dept")
     .limit(100);
 
-  // dept filter happens after populate since Leave has no dept field directly
+  // dept filter after populate
   if (filters.dept) {
     const deptRegex = new RegExp(`^${filters.dept}$`, "i");
     leaves = leaves.filter(l => l.employeeId && deptRegex.test(l.employeeId.dept || ""));
+  }
+
+  // name filter after populate
+  if (filters.name) {
+    const nameRegex = new RegExp(filters.name, "i");
+    leaves = leaves.filter(l => {
+      if (!l.employeeId) return false;
+      const full = `${l.employeeId.firstName} ${l.employeeId.lastName}`;
+      return nameRegex.test(full) || nameRegex.test(l.employeeId.firstName) || nameRegex.test(l.employeeId.lastName);
+    });
   }
 
   return leaves.slice(0, 50);
@@ -69,12 +87,38 @@ async function runTasksQuery(filters) {
     .populate("userId", "firstName lastName email dept")
     .limit(100);
 
+  // dept filter after populate
   if (filters.dept) {
     const deptRegex = new RegExp(`^${filters.dept}$`, "i");
     tasks = tasks.filter(t => t.userId && deptRegex.test(t.userId.dept || ""));
   }
 
+  // name filter after populate — "tasks of test employee"
+  if (filters.name) {
+    const nameRegex = new RegExp(filters.name, "i");
+    tasks = tasks.filter(t => {
+      if (!t.userId) return false;
+      const full = `${t.userId.firstName} ${t.userId.lastName}`;
+      return nameRegex.test(full) || nameRegex.test(t.userId.firstName) || nameRegex.test(t.userId.lastName);
+    });
+  }
+
   return tasks.slice(0, 50);
+}
+
+async function runAnnouncementsQuery(filters) {
+  const match = {};
+  // filter by title/content keyword if name is provided
+  if (filters.name) {
+    match.$or = [
+      { title:   new RegExp(filters.name, "i") },
+      { content: new RegExp(filters.name, "i") },
+    ];
+  }
+  const announcements = await Announcement.find(match)
+    .sort({ createdAt: -1 })
+    .limit(20);
+  return announcements;
 }
 
 exports.handleAiQuery = async (req, res) => {
@@ -100,6 +144,9 @@ exports.handleAiQuery = async (req, res) => {
         break;
       case "payroll":
         results = await runPayrollQuery(filters || {});
+        break;
+      case "announcements":
+        results = await runAnnouncementsQuery(filters || {});
         break;
       default:
         return res.json({ module: null, summary: summary || "I couldn't understand that request.", results: [] });

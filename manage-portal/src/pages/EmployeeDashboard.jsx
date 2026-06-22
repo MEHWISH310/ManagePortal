@@ -14,6 +14,7 @@ import { fetchUser }            from "../shared/api/usersApi";
 import { apiGet }               from "../shared/api/apiClient";
 import { GridIcon, LogoutIcon } from "../shared/icons/icons";
 import { NotificationsProvider } from "../shared/hooks/useNotifications";
+import AIAssistant from "../shared/ui/AIAssistant";
 
 const NAV = [
   { id: "overview",      path: "overview",      label: "My Dashboard"  },
@@ -183,6 +184,7 @@ export default function EmployeeDashboard({ onLogout }) {
             )}
           </div>
         </div>
+      <AIAssistant />
       </div>
       </NotificationsProvider>
     </>
