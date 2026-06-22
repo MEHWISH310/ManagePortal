@@ -50,6 +50,33 @@ router.post("/", protect, adminOnly, async (req, res) => {
   }
 });
 
+router.post("/bulk", protect, adminOnly, async (req, res) => {
+  try {
+    const { title, sub, type, recipientIds } = req.body;
+    // recipientIds = [] means broadcast (null), else targeted
+    if (!recipientIds || recipientIds.length === 0) {
+      const n = await Notification.create({
+        title, sub: sub || "", type: type || "system",
+        recipient: null, createdBy: req.user._id,
+      });
+      req.io?.emit("notification:new", { title, sub, type });
+      return res.status(201).json([n]);
+    }
+    const created = await Promise.all(
+      recipientIds.map(id => Notification.create({
+        title, sub: sub || "", type: type || "system",
+        recipient: id, createdBy: req.user._id,
+      }))
+    );
+    recipientIds.forEach(id => {
+      req.io?.to(`user:${id}`).emit("notification:new", { title, sub, type });
+    });
+    res.status(201).json(created);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // PATCH /api/notifications/:id/read — mark single as read
 router.patch("/:id/read", protect, async (req, res) => {
   try {
