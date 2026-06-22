@@ -11,10 +11,16 @@ connectDB();
 const app    = express();
 const server = http.createServer(app);
 
+const ALLOWED_ORIGINS = [
+  process.env.CLIENT_URL || "http://localhost:5173",
+  "http://localhost:5173",
+  "http://localhost:4173",
+];
+
 // ── Socket.IO setup ───────────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: {
-    origin:      process.env.CLIENT_URL || "http://localhost:5173",
+    origin:      ALLOWED_ORIGINS,
     credentials: true,
   },
 });
@@ -26,10 +32,9 @@ app.use((req, _, next) => { req.io = io; next(); });
 io.on("connection", (socket) => {
   console.log(`[WS] Client connected: ${socket.id}`);
 
-  // Client sends its role so we can join role-based rooms
   socket.on("join", ({ role, userId }) => {
     if (role === "admin") socket.join("admins");
-    socket.join(`user:${userId}`);     // personal room for targeted events
+    socket.join(`user:${userId}`);
     console.log(`[WS] ${socket.id} joined room: ${role}, user:${userId}`);
   });
 
@@ -38,11 +43,13 @@ io.on("connection", (socket) => {
   });
 });
 
-// Export io so routes can emit events
 module.exports.io = io;
 
 // ── Middleware ────────────────────────────────────────────────────────────────
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+app.use(cors({
+  origin:      ALLOWED_ORIGINS,
+  credentials: true,
+}));
 app.use(express.json({ limit: "10mb" }));
 
 // ── Routes ────────────────────────────────────────────────────────────────────
@@ -54,8 +61,8 @@ app.use("/api/announcements", require("./routes/announcements"));
 app.use("/api/payroll",       require("./routes/payroll"));
 app.use("/api/notifications", require("./routes/notifications"));
 app.use("/api/reports",       require("./routes/reports"));
+app.use("/api/ai-assistant",  require("./routes/aiAssistant"));
 
-// Optional routes (only load if file exists)
 try { app.use("/api/email",    require("./routes/email"));    } catch {}
 try { app.use("/api/payment",  require("./routes/payment"));  } catch {}
 try { app.use("/api/training", require("./routes/training")); } catch {}
