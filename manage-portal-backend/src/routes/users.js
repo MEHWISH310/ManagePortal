@@ -5,7 +5,7 @@ const { adminOnly, selfOrAdmin } = require("../middleware/roleCheck");
 
 const router = express.Router();
 
-// GET /api/users — active employees (deleted field missing wale bhi aayenge)
+// GET /api/users — active employees
 router.get("/", protect, adminOnly, async (req, res) => {
   try {
     const users = await User.find({ deleted: { $ne: true } }).select("-password");
@@ -15,10 +15,44 @@ router.get("/", protect, adminOnly, async (req, res) => {
   }
 });
 
-// GET /api/users/deleted — MUST be before /:id route
+// GET /api/users/deleted — MUST be before /:id
 router.get("/deleted", protect, adminOnly, async (req, res) => {
   try {
     const users = await User.find({ deleted: true }).select("-password");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ✅ NEW: GET /api/users/search?q=xyz&limit=10
+// Search by name, email, phone, username (employee code)
+// MUST be before /:id route
+// GET /api/users/search?q=xyz&limit=10
+router.get("/search", protect, adminOnly, async (req, res) => {
+  try {
+    const q     = (req.query.q || "").trim();
+    const limit = Math.min(parseInt(req.query.limit) || 10, 20);
+
+    if (!q) return res.json([]);
+
+    const regex = new RegExp(q, "i");
+
+    const users = await User.find({
+      deleted: { $ne: true },
+      // ✅ removed: role: { $ne: "admin" }  — ab sab aayenge including admins
+      $or: [
+        { firstName: regex },
+        { lastName:  regex },
+        { email:     regex },
+        { phone:     regex },
+        { username:  regex },
+      ],
+    })
+      .select("_id firstName lastName email phone username dept role") // ✅ role bhi add kiya
+      .limit(limit)
+      .lean();
+
     res.json(users);
   } catch (err) {
     res.status(500).json({ message: err.message });

@@ -1,40 +1,184 @@
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import SectionHeader from "../../shared/ui/SectionHeader";
 import { useNotifications } from "../../shared/hooks/useNotifications";
-import { fetchUsers } from "../../shared/api/usersApi";
-import { apiPost } from "../../shared/api/apiClient";
+import { apiPost, apiGet } from "../../shared/api/apiClient";
 import { LeaveIcon, MegaphoneIcon, PayrollIcon, TaskIcon, AlertIcon } from "../../shared/icons/icons";
-import Spinner from "../../shared/ui/Spinner"; 
+import Spinner from "../../shared/ui/Spinner";
 
 const ICON_CLS    = { leave: "tp-icon-leave", announce: "tp-icon-announce", payroll: "tp-icon-payroll", task: "tp-icon-task", system: "tp-icon-system" };
 const NOTIF_ICONS = { leave: LeaveIcon, announce: MegaphoneIcon, payroll: PayrollIcon, task: TaskIcon, system: AlertIcon };
 const TYPES       = ["All", "leave", "announce", "payroll", "task", "system"];
 const NOTIF_TYPES = ["leave", "announce", "payroll", "task", "system"];
 
+// ─── Employee Search + Select Component ───────────────────────────────────────
+// Works for both single (individual) and multi (group) selection.
+// Searches backend on every keystroke with 300ms debounce — never loads all employees.
+function EmployeeSearchSelect({ mode, selectedEmps, onChange }) {
+  const [query,   setQuery]   = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [open,    setOpen]    = useState(false);
+
+  const debounceRef = useRef(null);
+  const wrapperRef  = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSearch = (val) => {
+    setQuery(val);
+    if (!val.trim()) { setResults([]); setOpen(false); return; }
+
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const data = await apiGet(`/users/search?q=${encodeURIComponent(val.trim())}&limit=10`);
+        setResults(Array.isArray(data) ? data : []);
+        setOpen(true);
+      } catch {
+        setResults([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  };
+
+  const pickEmployee = (emp) => {
+    const id = emp._id || emp.id;
+    if (mode === "single") {
+      onChange([emp]);
+      setQuery(`${emp.firstName} ${emp.lastName}`);
+      setOpen(false);
+      setResults([]);
+    } else {
+      // multi — avoid duplicates
+      if (!selectedEmps.find(e => (e._id || e.id) === id)) {
+        onChange([...selectedEmps, emp]);
+      }
+      setQuery("");
+      setResults([]);
+      setOpen(false);
+    }
+  };
+
+  const removeEmployee = (id) => {
+    onChange(selectedEmps.filter(e => (e._id || e.id) !== id));
+  };
+
+  return (
+    <div ref={wrapperRef} style={{ position: "relative" }}>
+
+      {/* Selected chips */}
+      {selectedEmps.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+          {selectedEmps.map(emp => (
+            <div key={emp._id || emp.id}
+              style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 10px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 20, fontSize: 12.5, color: "#1d4ed8", fontWeight: 600 }}>
+              {emp.firstName} {emp.lastName}
+              <span
+                onClick={() => removeEmployee(emp._id || emp.id)}
+                style={{ cursor: "pointer", color: "#93c5fd", fontWeight: 700, marginLeft: 2, lineHeight: 1 }}>✕</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Search input */}
+      <div style={{ position: "relative" }}>
+        <input
+          className="field-input"
+          style={{ paddingLeft: 36, paddingRight: 36 }}
+          placeholder="Search by name, email, phone or employee code..."
+          value={query}
+          onChange={e => handleSearch(e.target.value)}
+          onFocus={() => { if (results.length > 0) setOpen(true); }}
+          autoComplete="off"
+        />
+        {/* Search icon */}
+        <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 14, pointerEvents: "none" }}>
+          🔍
+        </span>
+        {/* Loading dots */}
+        {loading && (
+          <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", fontSize: 11 }}>
+            searching...
+          </span>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{ position: "absolute", zIndex: 200, top: "calc(100% + 4px)", left: 0, right: 0, background: "#fff", border: "1.5px solid #e2e8f0", borderRadius: 10, boxShadow: "0 8px 24px rgba(0,0,0,0.08)", maxHeight: 260, overflowY: "auto" }}>
+          {results.length === 0 && !loading && (
+            <div style={{ padding: "12px 14px", fontSize: 13, color: "#94a3b8", textAlign: "center" }}>
+              No employees found for "{query}"
+            </div>
+          )}
+          {results.map(emp => {
+            const id          = emp._id || emp.id;
+            const alreadyPicked = selectedEmps.find(e => (e._id || e.id) === id);
+            return (
+              <div key={id}
+                onClick={() => !alreadyPicked && pickEmployee(emp)}
+                style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", cursor: alreadyPicked ? "default" : "pointer", background: alreadyPicked ? "#f8fafc" : "#fff", opacity: alreadyPicked ? 0.55 : 1, borderBottom: "1px solid #f1f5f9", transition: "background 0.12s" }}
+                onMouseEnter={ev => { if (!alreadyPicked) ev.currentTarget.style.background = "#f0f7ff"; }}
+                onMouseLeave={ev => { ev.currentTarget.style.background = alreadyPicked ? "#f8fafc" : "#fff"; }}
+              >
+                {/* Avatar */}
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: "#2563eb", color: "#fff", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {emp.firstName?.[0]}{emp.lastName?.[0]}
+                </div>
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+                    {emp.firstName} {emp.lastName}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {emp.email}
+                    {emp.phone    ? ` · ${emp.phone}`    : ""}
+                    {emp.username ? ` · ${emp.username}` : ""}
+                  </div>
+                </div>
+                {alreadyPicked && (
+                  <span style={{ fontSize: 11, color: "#94a3b8", flexShrink: 0 }}>Added ✓</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+// ──────────────────────────────────────────────────────────────────────────────
+
 export default function AdminNotificationsTab() {
   const { notifs, loading, error, handleMarkRead, handleMarkAll, handleDelete } = useNotifications();
 
-  const [filter,      setFilter]      = useState("All");
-  const [showCompose, setShowCompose] = useState(false);
-  const [title,       setTitle]       = useState("");
-  const [sub,         setSub]         = useState("");
-  const [type,        setType]        = useState("system");
-  const [sendTo,      setSendTo]      = useState("individual");    // "all" | "group" | "individual"
-  const [employees,   setEmployees]   = useState([]);
-  const [selected,    setSelected]    = useState([]);       // selected employee ids
-  const [sending,     setSending]     = useState(false);
-  const [successMsg,  setSuccessMsg]  = useState("");
+  const [filter,       setFilter]      = useState("All");
+  const [showCompose,  setShowCompose] = useState(false);
+  const [title,        setTitle]       = useState("");
+  const [sub,          setSub]         = useState("");
+  const [type,         setType]        = useState("system");
+  const [sendTo,       setSendTo]      = useState("individual");
+  const [selectedEmps, setSelectedEmps] = useState([]); // full emp objects (not just ids)
+  const [sending,      setSending]     = useState(false);
+  const [successMsg,   setSuccessMsg]  = useState("");
 
-  useEffect(() => {
-    if (showCompose) {
-      fetchUsers()
-        .then(data => setEmployees(Array.isArray(data) ? data.filter(e => e.role !== "admin") : []))
-        .catch(() => setEmployees([]));
-    }
-  }, [showCompose]);
-
-  const toggleEmployee = (id) => {
-    setSelected(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  const resetCompose = () => {
+    setSelectedEmps([]);
+    setSendTo("individual");
+    setTitle("");
+    setSub("");
+    setType("system");
   };
 
   const submit = async () => {
@@ -43,13 +187,14 @@ export default function AdminNotificationsTab() {
     try {
       let recipientIds = [];
       if (sendTo === "all")        recipientIds = [];
-      if (sendTo === "individual") recipientIds = selected.slice(0, 1);
-      if (sendTo === "group")      recipientIds = selected;
+      if (sendTo === "individual") recipientIds = selectedEmps.slice(0, 1).map(e => e._id || e.id);
+      if (sendTo === "group")      recipientIds = selectedEmps.map(e => e._id || e.id);
 
       await apiPost("/notifications/bulk", { title, sub, type, recipientIds });
 
       setSuccessMsg(`Notification sent to ${sendTo === "all" ? "everyone" : `${recipientIds.length} employee(s)`}!`);
-      setTitle(""); setSub(""); setType("system"); setSelected([]); setSendTo("all"); setShowCompose(false);
+      resetCompose();
+      setShowCompose(false);
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch {
       alert("Failed to send notification.");
@@ -60,6 +205,19 @@ export default function AdminNotificationsTab() {
 
   const unread   = notifs.filter(n => n.unread).length;
   const filtered = filter === "All" ? notifs : notifs.filter(n => n.type === filter);
+
+  // Send button label
+  const sendLabel = () => {
+    if (sending) return "Sending...";
+    if (sendTo === "all") return "Send to All";
+    if (sendTo === "individual" && selectedEmps.length === 1)
+      return `Send to ${selectedEmps[0].firstName}`;
+    if (sendTo === "group" && selectedEmps.length > 0)
+      return `Send to ${selectedEmps.length} Employee${selectedEmps.length !== 1 ? "s" : ""}`;
+    return "Send";
+  };
+
+  const sendDisabled = sending || (sendTo !== "all" && selectedEmps.length === 0);
 
   if (loading) return <Spinner text="Loading notifications..." />;
   if (error)   return <div style={{ padding: "2rem", color: "#dc2626" }}>Error: {error}</div>;
@@ -76,9 +234,9 @@ export default function AdminNotificationsTab() {
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
         {[
-          { label: "Total",  val: notifs.length,         color: "#2563eb", bg: "#eff6ff" },
-          { label: "Unread", val: unread,                 color: "#d97706", bg: "#fef9ec" },
-          { label: "Read",   val: notifs.length - unread, color: "#16a34a", bg: "#f0fdf4" },
+          { label: "Total",  val: notifs.length,          color: "#2563eb", bg: "#eff6ff" },
+          { label: "Unread", val: unread,                  color: "#d97706", bg: "#fef9ec" },
+          { label: "Read",   val: notifs.length - unread,  color: "#16a34a", bg: "#f0fdf4" },
         ].map(s => (
           <div key={s.label} style={{ background: s.bg, borderRadius: 12, padding: "14px 16px", border: `1px solid ${s.color}22` }}>
             <div style={{ fontSize: 11.5, fontWeight: 600, color: "#64748b", marginBottom: 4 }}>{s.label}</div>
@@ -91,7 +249,8 @@ export default function AdminNotificationsTab() {
       <div className="db-card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showCompose ? "1rem" : 0 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>Send Notification</span>
-          <button onClick={() => { setShowCompose(o => !o); setSelected([]); setSendTo("all"); }}
+          <button
+            onClick={() => { setShowCompose(o => !o); resetCompose(); }}
             style={{ fontSize: 12.5, fontWeight: 600, color: "#2563eb", background: "#eff6ff", border: "none", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontFamily: "inherit" }}>
             {showCompose ? "Cancel" : "+ New"}
           </button>
@@ -100,17 +259,17 @@ export default function AdminNotificationsTab() {
         {showCompose && (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
 
-            {/* Send To selector — AT TOP */}
+            {/* Send To selector */}
             <div>
               <div style={{ fontSize: 11.5, fontWeight: 600, color: "#64748b", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.4px" }}>Send To</div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {[
-                  { val: "individual", label: "Individual"    },
-                  { val: "group",      label: "Multiple Employees"         },
-                  { val: "all",        label: "All Employees" },
-                  
+                  { val: "individual", label: "Individual"        },
+                  { val: "group",      label: "Multiple Employees" },
+                  { val: "all",        label: "All Employees"      },
                 ].map(opt => (
-                  <button key={opt.val} onClick={() => { setSendTo(opt.val); setSelected([]); }}
+                  <button key={opt.val}
+                    onClick={() => { setSendTo(opt.val); setSelectedEmps([]); }}
                     style={{ fontSize: 12.5, fontWeight: 600, padding: "7px 16px", borderRadius: 8, border: `1.5px solid ${sendTo === opt.val ? "#2563eb" : "#e2e8f0"}`, background: sendTo === opt.val ? "#eff6ff" : "#f8fafc", color: sendTo === opt.val ? "#2563eb" : "#64748b", cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s" }}>
                     {opt.label}
                   </button>
@@ -118,54 +277,19 @@ export default function AdminNotificationsTab() {
               </div>
             </div>
 
-            {/* Employee selector for group/individual */}
-            {(sendTo === "group" || sendTo === "individual") && (
+            {/* ✅ Search-based employee selector — replaces old scrollable list */}
+            {(sendTo === "individual" || sendTo === "group") && (
               <div>
                 <div style={{ fontSize: 11.5, fontWeight: 600, color: "#64748b", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                  {sendTo === "individual" ? "Select Employee" : `Select Employees (${selected.length} selected)`}
+                  {sendTo === "individual"
+                    ? "Select Employee"
+                    : `Select Employees${selectedEmps.length > 0 ? ` (${selectedEmps.length} selected)` : ""}`}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto", border: "1.5px solid #e2e8f0", borderRadius: 10, padding: 8 }}>
-                  {employees.length === 0 ? (
-                    <div style={{ fontSize: 13, color: "#94a3b8", textAlign: "center", padding: "1rem" }}>Loading employees...</div>
-                  ) : employees.map(emp => {
-                    const isSelected = selected.includes(emp._id || emp.id);
-                    return (
-                      <div key={emp._id || emp.id}
-                        onClick={() => {
-                          const id = emp._id || emp.id;
-                          if (sendTo === "individual") {
-                            setSelected([id]);
-                          } else {
-                            toggleEmployee(id);
-                          }
-                        }}
-                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", background: isSelected ? "#eff6ff" : "#f8fafc", border: `1px solid ${isSelected ? "#bfdbfe" : "#f1f5f9"}`, transition: "all 0.15s" }}
-                      >
-                        {sendTo === "individual" ? (
-                          <input
-                            type="radio"
-                            name="emp-select"
-                            checked={isSelected}
-                            onChange={() => setSelected([emp._id || emp.id])}
-                            style={{ width: 16, height: 16, accentColor: "#2563eb", cursor: "pointer", flexShrink: 0 }}
-                            onClick={e => e.stopPropagation()}
-                          />
-                        ) : (
-                          <div style={{ width: 20, height: 20, borderRadius: 5, border: `2px solid ${isSelected ? "#2563eb" : "#cbd5e1"}`, background: isSelected ? "#2563eb" : "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-                            {isSelected && <span style={{ color: "#fff", fontSize: 12, lineHeight: 1 }}>✓</span>}
-                          </div>
-                        )}
-                        <div style={{ width: 28, height: 28, borderRadius: 7, background: "#2563eb", color: "#fff", fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          {`${emp.firstName?.[0] || ""}${emp.lastName?.[0] || ""}`}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{emp.firstName} {emp.lastName}</div>
-                          <div style={{ fontSize: 11.5, color: "#64748b" }}>{emp.email} · {emp.dept}</div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <EmployeeSearchSelect
+                  mode={sendTo === "individual" ? "single" : "multi"}
+                  selectedEmps={selectedEmps}
+                  onChange={setSelectedEmps}
+                />
               </div>
             )}
 
@@ -177,38 +301,31 @@ export default function AdminNotificationsTab() {
             </select>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-              <button onClick={() => setShowCompose(false)}
+              <button onClick={() => { setShowCompose(false); resetCompose(); }}
                 style={{ padding: "0 16px", height: 38, borderRadius: 8, border: "1.5px solid #e2e8f0", background: "none", fontSize: 13, fontWeight: 600, color: "#64748b", cursor: "pointer", fontFamily: "inherit" }}>
                 Cancel
               </button>
               <button className="submit-btn"
-                style={{ width: "auto", padding: "0 20px", height: 38, marginTop: 0, opacity: (sendTo !== "all" && selected.length === 0) ? 0.5 : 1 }}
+                style={{ width: "auto", padding: "0 20px", height: 38, marginTop: 0, opacity: sendDisabled ? 0.5 : 1 }}
                 onClick={submit}
-                disabled={sending || (sendTo !== "all" && selected.length === 0)}>
-                {sending
-                  ? "Sending..."
-                  : sendTo === "all"
-                  ? "Send to All"
-                  : sendTo === "individual" && selected.length === 1
-                  ? `Send to ${employees.find(e => (e._id || e.id) === selected[0])?.firstName || "Employee"}`
-                  : `Send to ${selected.length} Employee${selected.length !== 1 ? "s" : ""}`
-                }
+                disabled={sendDisabled}>
+                {sendLabel()}
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* List */}
+      {/* Notifications List */}
       <div className="db-card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
           <SectionHeader title="All Notifications" count={`${unread} unread`} />
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", gap: 6 }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {TYPES.map(f => (
                 <button key={f} onClick={() => setFilter(f)}
                   style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, border: "none", cursor: "pointer", background: filter === f ? "#2563eb" : "#f1f5f9", color: filter === f ? "#fff" : "#64748b", textTransform: "capitalize" }}>
-                  {f === "All" ? "All" : f}
+                  {f}
                 </button>
               ))}
             </div>
