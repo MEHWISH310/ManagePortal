@@ -170,6 +170,12 @@ function localFallbackParser(query) {
     filters.joinedAfter = d.toISOString();
   }
 
+  // ── Out-of-scope check — agar koi HR keyword nahi hai to null return karo ──
+  const hrKeywords = /employ|staff|worker|team|leave|task|payroll|salary|salary|announce|notif|training|course|admin|moderator|dept|department|hr|role|status|active|inactive|deleted|enrolled|join|hired/i;
+  if (!hrKeywords.test(q) && !filters.name && !filters.dept && !filters.status && !filters.role && !filters.deleted) {
+    return { module: null, filters: {}, summary: "I can only help with HR-related queries like employees, leaves, tasks, payroll, announcements, or training." };
+  }
+
   // ── Build summary ──
   const labelMap = { users: "employees", leaves: "leaves", tasks: "tasks", payroll: "payroll", announcements: "announcements", training: "trainings", notifications: "notifications", enrolled: "enrolled employees" };
   const moduleLabel = labelMap[module] || module;
