@@ -320,8 +320,8 @@ export default function AdminNotificationsTab() {
       <div className="db-card">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
           <SectionHeader title="All Notifications" count={`${unread} unread`} />
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "nowrap" }}>
               {TYPES.map(f => (
                 <button key={f} onClick={() => setFilter(f)}
                   style={{ fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 20, border: "none", cursor: "pointer", background: filter === f ? "#2563eb" : "#f1f5f9", color: filter === f ? "#fff" : "#64748b", textTransform: "capitalize" }}>

@@ -139,10 +139,34 @@ function localFallbackParser(query) {
     if (new RegExp(kw, "i").test(q)) { filters.dept = dept; break; }
   }
 
-  // ── Keyword filter for announcements / training / enrolled ──
+  // ── Keyword / date filter for announcements / training / enrolled ──
   if (module === "announcements" || module === "training") {
-    const kwMatch = q.match(/(?:about|on|regarding|related to)\s+([a-z][a-z\s]{1,40})$/i);
+    // keyword
+    const kwMatch = q.match(/(?:about|regarding|related to)\s+([a-z][a-z\s]{1,40})$/i);
     if (kwMatch) filters.keyword = kwMatch[1].trim();
+
+    // date filter for training — "on 25 june", "on june 25", "on 2026-06-25"
+    const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
+                     january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11 };
+    const dateMatch = q.match(/(?:on|date|scheduled on|of)\s+(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]+)/i)
+                   || q.match(/(?:on|date|scheduled on|of)\s+([a-z]+)\s+(\d{1,2})/i)
+                   || q.match(/(\d{4}-\d{2}-\d{2})/);
+    if (dateMatch && module === "training") {
+      let day, month, year = new Date().getFullYear();
+      if (dateMatch[0].match(/\d{4}-\d{2}-\d{2}/)) {
+        filters.trainingDate = dateMatch[1];
+      } else {
+        // "25 june" or "june 25"
+        const d1 = parseInt(dateMatch[1]), d2 = parseInt(dateMatch[2]);
+        const m1 = months[dateMatch[1]?.toLowerCase()], m2 = months[dateMatch[2]?.toLowerCase()];
+        if (!isNaN(d1) && m2 !== undefined)      { day = d1; month = m2; }
+        else if (m1 !== undefined && !isNaN(d2)) { day = d2; month = m1; }
+        if (day && month !== undefined) {
+          const pad = n => String(n).padStart(2,"0");
+          filters.trainingDate = `${year}-${pad(month+1)}-${pad(day)}`;
+        }
+      }
+    }
   } else if (module === "enrolled") {
     // extract training name: "enrolled in AI training" → "AI"
     const enrollMatch = q.match(/(?:enrolled in|paid for|registered for|joined)\s+([a-z][a-z\s]{1,40}?)(?:\s+training|\s+course|\s+workshop)?$/i)

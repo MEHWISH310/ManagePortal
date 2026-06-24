@@ -119,6 +119,10 @@ async function runTrainingQuery(filters) {
       { description: new RegExp(filters.keyword, "i") },
     ];
   }
+  // date filter — training.date is stored as "YYYY-MM-DD" string
+  if (filters.trainingDate) {
+    match.date = filters.trainingDate;
+  }
   return Training.find(match).sort({ createdAt: -1 }).limit(20);
 }
 
