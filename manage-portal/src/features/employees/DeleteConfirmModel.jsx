@@ -15,7 +15,7 @@ export default function DeleteConfirmModal({ employee, onClose, onConfirm }) {
         </div>
         <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a", marginBottom: 6 }}>Remove employee?</div>
         <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6, marginBottom: 20 }}>
-          This will permanently remove <strong style={{ color: "#0f172a" }}>{employee.name}</strong> from the roster. This action cannot be undone.
+          This will remove <strong style={{ color: "#0f172a" }}>{employee.name}</strong> from the roster. This action cannot be undone.
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
           <button onClick={onClose} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid #e2e8f0", background: "none", fontSize: 13, color: "#64748b", cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
