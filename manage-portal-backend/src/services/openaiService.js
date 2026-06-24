@@ -145,6 +145,14 @@ function localFallbackParser(query) {
     const kwMatch = q.match(/(?:about|regarding|related to)\s+([a-z][a-z\s]{1,40})$/i);
     if (kwMatch) filters.keyword = kwMatch[1].trim();
 
+    // past / upcoming trainings
+    if (/past|already happened|completed|done|finished|over|previous/.test(q)) {
+      filters.trainingPast = true;
+    }
+    if (/upcoming|future|scheduled|coming|next/.test(q)) {
+      filters.trainingUpcoming = true;
+    }
+
     // date filter for training — "on 25 june", "on june 25", "on 2026-06-25"
     const months = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11,
                      january:0,february:1,march:2,april:3,june:5,july:6,august:7,september:8,october:9,november:10,december:11 };
@@ -156,7 +164,6 @@ function localFallbackParser(query) {
       if (dateMatch[0].match(/\d{4}-\d{2}-\d{2}/)) {
         filters.trainingDate = dateMatch[1];
       } else {
-        // "25 june" or "june 25"
         const d1 = parseInt(dateMatch[1]), d2 = parseInt(dateMatch[2]);
         const m1 = months[dateMatch[1]?.toLowerCase()], m2 = months[dateMatch[2]?.toLowerCase()];
         if (!isNaN(d1) && m2 !== undefined)      { day = d1; month = m2; }

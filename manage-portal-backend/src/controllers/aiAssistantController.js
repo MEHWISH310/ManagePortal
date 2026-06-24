@@ -119,11 +119,15 @@ async function runTrainingQuery(filters) {
       { description: new RegExp(filters.keyword, "i") },
     ];
   }
-  // date filter — training.date is stored as "YYYY-MM-DD" string
   if (filters.trainingDate) {
     match.date = filters.trainingDate;
   }
-  return Training.find(match).sort({ createdAt: -1 }).limit(20);
+  // past/upcoming — date is "YYYY-MM-DD" string, compare lexicographically
+  const today = new Date().toISOString().slice(0, 10);
+  if (filters.trainingPast)     match.date = { $lt: today };
+  if (filters.trainingUpcoming) match.date = { $gte: today };
+
+  return Training.find(match).sort({ date: filters.trainingPast ? -1 : 1 }).limit(20);
 }
 
 async function runNotificationsQuery(filters, userId) {

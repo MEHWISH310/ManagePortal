@@ -333,6 +333,11 @@ export default function TrainingTab({ mode = "employee" }) {
 
   const isPaid = (tid) => myPayments.some(p => p.trainingId?._id === tid && p.status === "paid");
 
+  // Split trainings into upcoming and past based on date
+  const today = new Date().toISOString().slice(0, 10);
+  const upcomingTrainings = trainings.filter(t => t.date >= today);
+  const pastTrainings     = trainings.filter(t => t.date < today);
+
   const handlePay = async (training) => {
     setPayingId(training._id);
     try {
@@ -463,40 +468,87 @@ export default function TrainingTab({ mode = "employee" }) {
                 {isAdmin ? "No trainings added yet." : "No trainings scheduled yet."}
               </div>
             ) : isAdmin ? (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
-                {trainings.map(t => (
-                  <div key={t._id} style={{ border: "1px solid #e2e8f0", borderRadius: 14, padding: "1.1rem 1.2rem", background: "#fff", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{t.title}</div>
-                      <span style={{ fontSize: 15, fontWeight: 800, color: "#2563eb", whiteSpace: "nowrap" }}>₹{t.price}</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {/* Upcoming trainings */}
+                {upcomingTrainings.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                      Upcoming <span style={{ background: "#eff6ff", color: "#2563eb", fontSize: 11, padding: "1px 8px", borderRadius: 20 }}>{upcomingTrainings.length}</span>
                     </div>
-                    {t.description && <div style={{ fontSize: 12.5, color: "#64748b" }}>{t.description}</div>}
-                    <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 12, color: "#64748b" }}>📅 {t.date}</span>
-                      {t.duration && <span style={{ fontSize: 12, color: "#64748b" }}>⏱ {t.duration}</span>}
-                    </div>
-                    <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <button onClick={() => setEnrolledModal(t)}
-                        style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#2563eb", background: "#eff6ff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>
-                        👥 {enrolledCounts[t._id] || 0} Enrolled
-                      </button>
-                      <div style={{ display: "flex", gap: 6 }}>
-                        <button onClick={() => setEditModal(t)}
-                          style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", background: "#eff6ff", border: "none", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}>
-                          Edit
-                        </button>
-                        <button onClick={() => handleDelete(t._id)}
-                          style={{ fontSize: 12, fontWeight: 600, color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}>
-                          Remove
-                        </button>
-                      </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
+                      {upcomingTrainings.map(t => (
+                        <div key={t._id} style={{ border: "1px solid #e2e8f0", borderRadius: 14, padding: "1.1rem 1.2rem", background: "#fff", display: "flex", flexDirection: "column", gap: 8, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "#0f172a" }}>{t.title}</div>
+                            <span style={{ fontSize: 15, fontWeight: 800, color: "#2563eb", whiteSpace: "nowrap" }}>₹{t.price}</span>
+                          </div>
+                          {t.description && <div style={{ fontSize: 12.5, color: "#64748b" }}>{t.description}</div>}
+                          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 12, color: "#64748b" }}>📅 {t.date}</span>
+                            {t.duration && <span style={{ fontSize: 12, color: "#64748b" }}>⏱ {t.duration}</span>}
+                          </div>
+                          <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <button onClick={() => setEnrolledModal(t)}
+                              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#2563eb", background: "#eff6ff", border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+                              👥 {enrolledCounts[t._id] || 0} Enrolled
+                            </button>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={() => setEditModal(t)}
+                                style={{ fontSize: 12, fontWeight: 600, color: "#2563eb", background: "#eff6ff", border: "none", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+                                Edit
+                              </button>
+                              <button onClick={() => handleDelete(t._id)}
+                                style={{ fontSize: 12, fontWeight: 600, color: "#64748b", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 7, padding: "5px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
+
+                {/* Past trainings — no edit/remove */}
+                {pastTrainings.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+                      Past Trainings <span style={{ background: "#f1f5f9", color: "#64748b", fontSize: 11, padding: "1px 8px", borderRadius: 20 }}>{pastTrainings.length}</span>
+                    </div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
+                      {pastTrainings.map(t => (
+                        <div key={t._id} style={{ border: "1px solid #e2e8f0", borderRadius: 14, padding: "1.1rem 1.2rem", background: "#f8fafc", display: "flex", flexDirection: "column", gap: 8, opacity: 0.85 }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b" }}>{t.title}</div>
+                            <span style={{ fontSize: 15, fontWeight: 800, color: "#94a3b8", whiteSpace: "nowrap" }}>₹{t.price}</span>
+                          </div>
+                          {t.description && <div style={{ fontSize: 12.5, color: "#94a3b8" }}>{t.description}</div>}
+                          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                            <span style={{ fontSize: 12, color: "#94a3b8" }}>📅 {t.date}</span>
+                            {t.duration && <span style={{ fontSize: 12, color: "#94a3b8" }}>⏱ {t.duration}</span>}
+                          </div>
+                          <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <button onClick={() => setEnrolledModal(t)}
+                              style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, color: "#64748b", background: "#f1f5f9", border: "none", borderRadius: 7, padding: "6px 12px", cursor: "pointer", fontFamily: "inherit" }}>
+                              👥 {enrolledCounts[t._id] || 0} Enrolled
+                            </button>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: "#94a3b8", background: "#f1f5f9", padding: "4px 10px", borderRadius: 7 }}>
+                              Completed
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
-                {trainings.map(t => {
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+                {upcomingTrainings.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#2563eb", marginBottom: 10 }}>📅 Upcoming Trainings</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
+                {upcomingTrainings.map(t => {
                   const paid = isPaid(t._id);
                   return (
                     <div key={t._id} style={{ border: `1px solid ${paid ? "#bbf7d0" : "#f1f5f9"}`, borderRadius: 12, padding: "1rem 1.1rem", background: paid ? "#f0fdf4" : "#fafafa", position: "relative", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -521,6 +573,37 @@ export default function TrainingTab({ mode = "employee" }) {
                     </div>
                   );
                 })}
+                    </div>
+                  </div>
+                )}
+                {/* Past trainings — employee view */}
+                {pastTrainings.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#64748b", marginBottom: 10 }}>✅ Past Trainings</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
+                      {pastTrainings.map(t => {
+                        const paid = isPaid(t._id);
+                        return (
+                          <div key={t._id} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: "1rem 1.1rem", background: "#f8fafc", opacity: 0.8, display: "flex", flexDirection: "column", gap: 6 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b" }}>{t.title}</div>
+                            {t.description && <div style={{ fontSize: 12.5, color: "#94a3b8" }}>{t.description}</div>}
+                            <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                              <span style={{ fontSize: 12, color: "#94a3b8" }}>📅 {t.date}</span>
+                              {t.duration && <span style={{ fontSize: 12, color: "#94a3b8" }}>⏱ {t.duration}</span>}
+                              <span style={{ fontSize: 14, fontWeight: 700, color: "#94a3b8" }}>₹{t.price}</span>
+                            </div>
+                            <div style={{ marginTop: "auto", paddingTop: 8 }}>
+                              {paid
+                                ? <div style={{ fontSize: 12, fontWeight: 600, color: "#16a34a" }}>✓ You were enrolled</div>
+                                : <div style={{ fontSize: 12, color: "#94a3b8" }}>Training completed</div>
+                              }
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -590,6 +673,7 @@ export default function TrainingTab({ mode = "employee" }) {
                         <td style={{ fontWeight: 700, color: "#2563eb" }}>₹{p.amount}</td>
                         <td style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>{p.razorpayPaymentId || "—"}</td>
                         <td style={{ fontSize: 11, color: "#94a3b8", fontFamily: "monospace" }}>{p.razorpayOrderId || "—"}</td>
+                        {/* CHANGED: date + time dono show karo */}
                         <td style={{ fontSize: 12 }}>
                           <div>{new Date(p.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</div>
                           <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
